@@ -2,7 +2,7 @@
     Stores Game settings + hardcode stuffs + magic numbers
 """
 import pygame
-import sys
+import sys, json
 from pygame.locals import *
 
 #Game settings
@@ -18,18 +18,21 @@ COLOR_WHITE = (255, 255, 255)
 COLOR_GREEN = (0, 255, 0)
 
 #Game physics settings
-gGRAVITY = 900.0
+GAME_GRAVITY = 900.0
 
 ##place holder for map collision
-mBOTTOM = 650
-mLEFT = 30
-mRIGHT = 1250
+MAP_BOTTOM = 650
+MAP_LEFT = 30
+MAP_RIGHT = 1250
 
-pSPEED = 500.0
-pJUMPSTRENGTH = 600.0
-pJUMPHOLDTIME = 0.5                          # in secs
-pDOUBLEJUMPHOLDTIME = 0.3                    # in secs
-pDOUBLEJUMPSTRENGTH = 400.0
-pINIT_POS = pygame.Vector2(100, 100)
-pHURTBOX_WIDTH = 32
-pHURTBOX_HEIGHT = 32
+# Player base stats
+PLAYER_SPEED = 500.0
+PLAYER_DASHCOOLDOWN = 1.0
+PLAYER_DASHSPEED = 3000.0
+PLAYER_JUMPSTRENGTH = 600.0
+PLAYER_JUMPHOLDTIME = 0.5                          # in secs
+PLAYER_DOUBLEJUMPHOLDTIME = 0.3                    # in secs
+PLAYER_DOUBLEJUMPSTRENGTH = 400.0
+PLAYER_INIT_POS = pygame.Vector2(100, 100)
+PLAYER_HURTBOX_WIDTH = 32
+PLAYER_HURTBOX_HEIGHT = 32

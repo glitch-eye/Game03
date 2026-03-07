@@ -33,6 +33,14 @@ class Game:
     def check_collision(self):
         self.player.check_collision()
 
+    def save(self, savename=None):
+        """Save current game progress to new save / override current save"""
+        pass
+
+    def load(self, savename):
+        """Load saved progress"""
+        pass
+
     def play(self):
         """Game loop"""
         while True:
