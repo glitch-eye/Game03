@@ -31,6 +31,7 @@ class Character:
         self._jumpHolding = False
         self._jumpMaxHold = self._jumpholdDuration
         self._wasMoving = False
+        self._crouching = False
 
         # sprite
         self.animations = {
@@ -42,7 +43,8 @@ class Character:
             "run": loader.get_animation("player_run"),
             "run_start": loader.get_animation("player_run_start"),
             "run_stop": loader.get_animation("player_run_stop"),
-            "run_back": loader.get_animation("player_run_back")
+            "run_back": loader.get_animation("player_run_back"),
+            "crouch": loader.get_animation("player_down")
         }
 
         self.current_anim = "idle"
@@ -50,7 +52,7 @@ class Character:
 
         self.frame_index = 0
         self.frame_timer = 0
-        self.frame_speed = 0.05
+        self.frame_speed = 0.07
 
         self._image = self.frames[0]
 
@@ -73,9 +75,17 @@ class Character:
 
     def handleInput(self, keys):
 
-        # horizontal movement
+        # crouch input (only allowed on ground)
+        self._crouching = keys[K_s] and self._grounded
+
+        # horizontal input
         self._inputDir = (keys[K_d] - keys[K_a])
-        self._vel.x = self._inputDir * self._moveSpeed
+
+        # prevent movement while crouching
+        if self._crouching:
+            self._vel.x = 0
+        else:
+            self._vel.x = self._inputDir * self._moveSpeed
 
         jumpPressed = keys[K_SPACE]
         jumpJustPressed = jumpPressed and not self._jumpPressedLastFrame
@@ -121,7 +131,7 @@ class Character:
             self._jumpBufferTimer -= dt
 
         # execute buffered jump if possible
-        if self._jumpBufferTimer > 0:
+        if self._jumpBufferTimer > 0 and not self._crouching: # Remove not crouching in case of slide later
 
             if self._grounded:
 
@@ -208,6 +218,9 @@ class Character:
 
         elif self._gliding:
             self.set_animation("glide")
+
+        elif self._crouching:
+            self.set_animation("crouch")
 
         elif self._grounded:
 

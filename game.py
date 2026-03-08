@@ -39,6 +39,7 @@ class Game:
         self.loader.load_animation("player_run_start", "assets/sprite/player_run_start")
         self.loader.load_animation("player_run_stop", "assets/sprite/player_run_stop")
         self.loader.load_animation("player_run_back", "assets/sprite/player_run_back")
+        self.loader.load_animation("player_down", "assets/sprite/player_down")
 
         # sounds
 
