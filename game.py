@@ -124,6 +124,14 @@ class Game:
 
         self._display.blit(scaled, (0,0))
         pygame.display.flip()
+    
+    def save(self, savename=None):
+        """Save current game progress to new save / override current save"""
+        pass
+
+    def load(self, savename):
+        """Load saved progress"""
+        pass
 
     # -----------------------
     # GAME LOOP
