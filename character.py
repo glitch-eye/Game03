@@ -39,6 +39,10 @@ class Character:
         self._jumpMaxHold = self._jumpholdDuration
         self._wasMoving = False
         self._crouching = False
+        self._dashCD = 0.0
+        self._dashCDStat = PLAYER_DASHCOOLDOWN
+        self._dash = False
+        self._dashSpeed = PLAYER_DASHSPEED
 
         # sprite
         self.animations = {
@@ -72,7 +76,7 @@ class Character:
 
         # gliding
         self._gliding = False
-        self._glideGravity = gGRAVITY * 0.25
+        self._glideGravity = GAME_GRAVITY * 0.25
         self._maxGlideFallSpeed = 120
         self._jumpHeld = False          
 
@@ -140,21 +144,6 @@ class Character:
         # execute buffered jump if possible
         if self._jumpBufferTimer > 0 and not self._crouching: # Remove later when couch+jump allows sliding
 
-        self._dashCD = 0.0
-        self._dashCDStat = PLAYER_DASHCOOLDOWN
-        self._dash = False
-        self._dashSpeed = PLAYER_DASHSPEED
-
-        #placeholder for char image
-        self._image = pygame.Surface((PLAYER_HURTBOX_WIDTH, PLAYER_HURTBOX_HEIGHT))
-        self._image.fill(COLOR_GREEN)
-    
-    def handleInput(self, keys):
-        if keys[self._keys["left"]]:
-            self._vel.x = -self._moveSpeed
-        if keys[self._keys["right"]]:
-            self._vel.x = self._moveSpeed
-        if keys[self._keys["jump"]]:
             if self._grounded:
 
                 self._vel.y = -self._jumpforce
@@ -186,6 +175,13 @@ class Character:
         if not self._grounded and self._vel.y > 0 and self._jumpHeld:
             self._gliding = True
 
+        if self._dash:
+            self._pos.x += self._dashSpeed * dt * (self._vel.x / abs(self._vel.x))
+            self._dash = False
+        else:
+            self._pos.x += self._vel.x * dt
+        self._pos.y += self._vel.y * dt
+
         # gravity
         if self._gliding:
             self._vel.y += self._glideGravity * dt
@@ -194,41 +190,9 @@ class Character:
             if self._vel.y > self._maxGlideFallSpeed:
                 self._vel.y = self._maxGlideFallSpeed
         else:
-            self._vel.y += gGRAVITY * dt
-            else:
-                if not self._jumpHolding:
-                    if (self._jumpTimes != 2):
-                        self._vel.y = -self._doublejumpForce
-                        self._jumpMaxHold = self._doublejumpholdDuration
-                        self._curJumpHold = 0.0
-                        self._jumpTimes = 2
-                        self._jumpHolding = True
-        if keys[self._keys["dash"]]:
-            if self._dashCD <= 0.0:
-                self._dashCD = self._dashCDStat
-                self._dash = True
-
-        #key release
-        if ((not keys[self._keys["left"]] and self._vel.x == -self._moveSpeed) 
-            or (not keys[self._keys["right"]] and self._vel.x == self._moveSpeed)): 
-            self._vel.x = 0
-
-        if self._curJumpHold >= self._jumpMaxHold:
-            self._vel.y = self._gravity
-        if not keys[self._keys["jump"]]:
-            self._jumpHolding = False
-            self._curJumpHold = 0.0
-            self._vel.y = self._gravity
-
-    def update(self, deltaTime):
-        if self._dash:
-            self._pos.x += self._dashSpeed * deltaTime * (self._vel.x / abs(self._vel.x))
-            self._dash = False
-        else:
-            self._pos.x += self._vel.x * deltaTime
-        self._pos.y += self._vel.y * deltaTime
-
-        # variable jump height
+            self._vel.y += GAME_GRAVITY * dt
+        
+         # variable jump height
         if not self._jumpHolding and self._vel.y < 0:
             self._vel.y = 0
 
@@ -320,10 +284,7 @@ class Character:
             self.frame_timer = 0
 
             if self.current_anim == "fall":
-            self._curJumpHold += deltaTime
-        if self._dashCD > 0.0:
-            self._dashCD -= deltaTime
-
+                self._curJumpHold += dt
                 # loop last 2 frames
                 if self.frame_index < len(self.frames) - 2:
                     self.frame_index += 1
@@ -371,6 +332,9 @@ class Character:
             else:
                 # normal looping animation
                 self.frame_index = (self.frame_index + 1) % len(self.frames)
+
+        if self._dashCD > 0.0:
+            self._dashCD -= dt
 
             self._image = self.frames[self.frame_index]
 
