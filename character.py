@@ -131,7 +131,7 @@ class Character:
             self._jumpBufferTimer -= dt
 
         # execute buffered jump if possible
-        if self._jumpBufferTimer > 0 and not self._crouching: # Remove not crouching in case of slide later
+        if self._jumpBufferTimer > 0 and not self._crouching: # Remove later when couch+jump allows sliding
 
             if self._grounded:
 
