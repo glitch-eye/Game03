@@ -141,6 +141,10 @@ class Character:
         if self._jumpBufferTimer > 0:
             self._jumpBufferTimer -= dt
 
+        # dash cooldown
+        if self._dashCD > 0.0:
+            self._dashCD -= dt
+
         # execute buffered jump if possible
         if self._jumpBufferTimer > 0 and not self._crouching: # Remove later when couch+jump allows sliding
 
@@ -203,7 +207,6 @@ class Character:
                 self._jumpHolding = False
 
         # move
-        self._pos += self._vel * dt
         isMoving = abs(self._vel.x) > 0
         turning = False
 
@@ -214,7 +217,7 @@ class Character:
                 turning = True
 
         # sync rect BEFORE collision
-        self._rect.topleft = (int(self._pos.x), int(self._pos.y))
+        self._rect.midtop = (int(self._pos.x), int(self._pos.y))
 
         # collision
         self.check_collision()
@@ -333,10 +336,7 @@ class Character:
                 # normal looping animation
                 self.frame_index = (self.frame_index + 1) % len(self.frames)
 
-        if self._dashCD > 0.0:
-            self._dashCD -= dt
-
-            self._image = self.frames[self.frame_index]
+        self._image = self.frames[self.frame_index]
 
         # sync rect AGAIN after collision fix
         self._rect.midtop = (int(self._pos.x), int(self._pos.y))

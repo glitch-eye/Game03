@@ -23,7 +23,7 @@ COLOR_BLACK = (0, 0, 0)
 GAME_GRAVITY = 1200.0
 
 ##place holder for map collision
-MAP_BOTTOM = 650
+MAP_BOTTOM = 360
 MAP_LEFT = 0
 MAP_RIGHT = 640
 
