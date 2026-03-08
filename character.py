@@ -39,6 +39,7 @@ class Character:
         self._jumpMaxHold = self._jumpholdDuration
         self._wasMoving = False
         self._crouching = False
+
         self._dashCD = 0.0
         self._dashCDStat = PLAYER_DASHCOOLDOWN
         self._dash = False
@@ -73,6 +74,7 @@ class Character:
 
         # facing
         self._facingRight = True
+        self._lastInputDir = 0
 
         # gliding
         self._gliding = False
@@ -117,9 +119,9 @@ class Character:
     # ANIMATION SWITCHING
     # -----------------------
 
-    def set_animation(self, name):
+    def set_animation(self, name, restart=False):
 
-        if self.current_anim != name:
+        if self.current_anim != name or restart:
 
             self.current_anim = name
             self.frames = self.animations[name]
@@ -255,14 +257,12 @@ class Character:
                     turning = True
 
             if turning:
-                self.set_animation("run_back")
                     # flip immediately
                 if self._inputDir > 0:
                     self._facingRight = True
                 elif self._inputDir < 0:
                     self._facingRight = False
-
-                self.set_animation("run_back")
+                self.set_animation("run_back", True)
 
             elif not self._wasMoving and isMoving:
                 self.set_animation("run_start")
