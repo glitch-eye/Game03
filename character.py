@@ -256,6 +256,13 @@ class Character:
 
             if turning:
                 self.set_animation("run_back")
+                    # flip immediately
+                if self._inputDir > 0:
+                    self._facingRight = True
+                elif self._inputDir < 0:
+                    self._facingRight = False
+
+                self.set_animation("run_back")
 
             elif not self._wasMoving and isMoving:
                 self.set_animation("run_start")
@@ -324,12 +331,6 @@ class Character:
                 if self.frame_index < len(self.frames) - 1:
                     self.frame_index += 1
                 else:
-
-                    if self._inputDir > 0:
-                        self._facingRight = True
-                    elif self._inputDir < 0:
-                        self._facingRight = False
-
                     self.set_animation("run")
 
             else:
