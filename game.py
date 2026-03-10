@@ -59,6 +59,8 @@ class Game:
         self.loader.load_animation("player_up_shot_air","assets/sprite/player_up_shot_air")
         self.loader.load_animation("player_under_attack","assets/sprite/player_under_attack")
         self.loader.load_animation("player_sliding","assets/sprite/player_sliding")
+        self.loader.load_animation("player_time_stop", "assets/sprite/player_time_stop")
+        self.loader.load_animation("player_time_stop_air", "assets/sprite/player_time_stop_air")
 
         # sounds
 
@@ -69,6 +71,9 @@ class Game:
         )
 
         # music
+        # self.loader.load_music("Luna_Dial", "assets/music/Lunar Clock Lunar Dial.ogg")
+        # music_path = self.loader.get_music("Luna_Dial")
+        # pygame.mixer.music.load(music_path)
 
         # loading screen loop
         while not self.loader.done():
@@ -88,6 +93,9 @@ class Game:
 
         # finalize assets
         self.loader.finalize()
+
+        # start music
+        # pygame.mixer.music.play(-1)   # -1 = loop forever
 
         # retrieve animation frames
         self.wisp_frames = self.loader.get_animation("wisp")

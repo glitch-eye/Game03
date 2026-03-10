@@ -16,7 +16,8 @@ class Character:
             "up": K_w,
             "down": K_s,
             "dash": K_LSHIFT,
-            "attack": K_j
+            "attack": K_j,          #also slows (implement later)
+            "stop": K_k,
         }
 
         #stats
@@ -48,6 +49,7 @@ class Character:
         self._dash = False
         self._dashSpeed = PLAYER_DASHSPEED
 
+        # slide
         self.player_sliding = False
         self.slide_timer = 0
         self.slide_duration = PLAYER_SLIDE_DURATION
@@ -80,8 +82,11 @@ class Character:
             "up_shot_run": loader.get_animation("player_up_shot_run"),
             "under_attack": loader.get_animation("player_under_attack"),
             "slide": loader.get_animation("player_sliding"),
+            "time_stop": trim_top(loader.get_animation("player_time_stop")),
+            "time_stop_air": loader.get_animation("player_time_stop_air")
         }
 
+        # special effects
         self.double_jump_effects = []
         self.arrow_ring_sprite = loader.get_animation("arrow_ring_sprite")
         self.double_jump_effect_sprite = self.jump_effect_frames = loader.get_animation("player_jump_effect")
@@ -129,12 +134,26 @@ class Character:
 
         self._comboSequence = [1,2,3,4]
 
+        # time stop
+        self.time_stop = False
+        self.time_stop_timer = 0
+        self.time_stop_frames = loader.get_animation("player_time_stop")
+        self.time_stop_frame_speed = 0.1
+        self.time_stop_duration = len(self.time_stop_frames) * self.time_stop_frame_speed
+
+        self._stopPressedLastFrame = False
+
+        self.anim_offsets = {
+            "time_stop": (0, -3),       
+            "time_stop_air": (-10, 0)
+        }
+
     # -----------------------
     # INPUT
     # -----------------------
 
     def handleInput(self, keys):
-        if self.player_sliding:
+        if self.player_sliding or self.time_stop:
             return
 
         # crouch input (only allowed on ground)
@@ -164,6 +183,13 @@ class Character:
             self._curJumpHold = 0
 
         self._jumpPressedLastFrame = jumpPressed
+
+        # time stop
+        stopPressed = keys[self._keys["stop"]]
+        stopJustPressed = stopPressed and not self._stopPressedLastFrame
+        if stopJustPressed and not self.time_stop:
+            self.start_time_stop()
+        self._stopPressedLastFrame = stopPressed
 
         # attack
         attackPressed = keys[K_j]
@@ -207,6 +233,44 @@ class Character:
     # -----------------------
 
     def update(self, dt):
+
+        # time stop freeze
+        if self.time_stop:
+            self.time_stop_timer -= dt
+            # freeze movement
+            self._vel.x = 0
+            self._vel.y = 0
+            # advance animation timer
+            self.frame_timer += dt
+            if self.frame_timer >= self.frame_speed:
+                self.frame_timer = 0
+
+                if self.frame_index < len(self.frames) - 1:
+                    self.frame_index += 1
+            self._image = self.frames[self.frame_index]
+            # --- update double jump effects even during time stop ---
+            for effect in self.double_jump_effects[:]:
+
+                effect["timer"] += dt
+
+                if effect["timer"] >= effect["speed"]:
+                    effect["timer"] = 0
+                    effect["frame"] += 1
+
+                if effect["frame"] >= len(effect["frames"]):
+                    self.double_jump_effects.remove(effect)
+            if self.time_stop_timer <= 0:
+                self.time_stop = False
+                self.frame_speed = 0.07
+                if self._grounded:
+                    self.set_animation("idle")
+                else:
+                    if self._vel.y < 0:
+                        self.set_animation("jump")
+                    else:
+                        self.set_animation("fall")
+            return
+
         was_grounded = self._grounded
 
         # update jump buffer timer
@@ -675,7 +739,19 @@ class Character:
         if self.current_anim in ("up_shot", "up_shot2", "up_shot_air", "up_shot_run"):
             draw_pos = (draw_pos[0], draw_pos[1] - 32)
 
-        draw_rect = image.get_rect(midtop=draw_pos)
+        offset = self.anim_offsets.get(self.current_anim, (0, 0))
+
+        offset_x = offset[0]
+        offset_y = offset[1]
+
+        # flip X offset when facing left
+        if not self._facingRight:
+            offset_x = -offset_x
+
+        draw_rect = image.get_rect(midtop=(
+            draw_pos[0] + offset_x,
+            draw_pos[1] + offset_y
+        ))
 
         screen.blit(image, draw_rect)
 
@@ -724,6 +800,20 @@ class Character:
         self.set_animation(anim, True)
         self.frame_speed = self.attack_frame_speed
 
+    def start_time_stop(self):
+        if self.time_stop:
+            return
+        self.time_stop = True
+        if self._grounded:
+            anim = "time_stop"
+        else:
+            anim = "time_stop_air"
+        self.set_animation(anim, True)
+        # slower animation speed
+        self.frame_speed = self.time_stop_frame_speed
+        frames = self.animations[anim]
+        self.time_stop_timer = len(frames) * self.frame_speed
+
 
     # ------------------------
     # HELPER
@@ -740,6 +830,31 @@ def trim_right(frames, pixels):
 
         new_rect = pygame.Rect(0, 0, w - pixels, h)
 
+        trimmed_frame = frame.subsurface(new_rect).copy()
+
+        trimmed.append(trimmed_frame)
+
+    return trimmed
+
+def trim_top(frames):
+
+    trimmed = []
+
+    for frame in frames:
+
+        w, h = frame.get_size()
+        trim_y = 0
+
+        # find first row that contains a visible pixel
+        for y in range(h):
+            for x in range(w):
+                if frame.get_at((x, y)).a != 0:
+                    trim_y = y
+                    break
+            if trim_y != 0 or frame.get_at((0, y)).a != 0:
+                break
+
+        new_rect = pygame.Rect(0, trim_y, w, h - trim_y)
         trimmed_frame = frame.subsurface(new_rect).copy()
 
         trimmed.append(trimmed_frame)
