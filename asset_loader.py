@@ -1,4 +1,4 @@
-import os
+import os, re
 import pygame
 from concurrent.futures import ThreadPoolExecutor
 
@@ -34,7 +34,8 @@ class AssetLoader:
             os.path.join(folder, f)
             for f in os.listdir(folder)
             if f.endswith(".png")
-        ])
+        ],
+        key=lambda x: int(re.search(r'\d+', os.path.basename(x)).group()))
 
         future = self.executor.submit(self._load_frames, files)
         self.anim_futures[name] = future

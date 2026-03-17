@@ -1,5 +1,6 @@
 from settings import *
 from character import *
+from wisp import *
 from asset_loader import AssetLoader
 import pygame
 import sys
@@ -21,7 +22,8 @@ class Game:
         self.loader = AssetLoader()
 
         self.player = None
-        self.wisp_frames = None   # store animation frames
+        self.wisp = None   # store animation frames
+        self.goblin = None
 
     # -----------------------
     # ASSET LOADING
@@ -62,6 +64,11 @@ class Game:
         self.loader.load_animation("player_time_stop", "assets/sprite/player_time_stop")
         self.loader.load_animation("player_time_stop_air", "assets/sprite/player_time_stop_air")
 
+        self.loader.load_animation("crystal", "assets/sprite/crystal_sprite")
+        self.loader.load_animation("big_bomb_effect", "assets/sprite/big_bomb_effect")
+        self.loader.load_animation("mp_item", "assets/sprite/mpup_sprite")
+        self.loader.load_animation("hp_item", "assets/sprite/hpup_sprite")
+
         # sounds
 
         # enemies
@@ -69,6 +76,10 @@ class Game:
             "wisp",
             "assets/sprite/will_o_wisp_sprite"
         )
+
+        self.loader.load_animation("goblin_attack", "assets/sprite/goblin_attack_sprite")
+        self.loader.load_animation("goblin_run", "assets/sprite/goblin_run_sprite")
+        self.loader.load_animation("goblin_idle", "assets/sprite/goblin_sprite")
 
         # music
         # self.loader.load_music("Luna_Dial", "assets/music/Lunar Clock Lunar Dial.ogg")
@@ -98,7 +109,10 @@ class Game:
         # pygame.mixer.music.play(-1)   # -1 = loop forever
 
         # retrieve animation frames
-        self.wisp_frames = self.loader.get_animation("wisp")
+        self.wisp = Wisp(0, 0, self.loader.get_animation("wisp"))
+        self.goblin = Goblin(0, 0, self.loader)
+
+        self.crystal = Crystal(self.loader, 1)
 
         # create entities AFTER assets exist
         self.player = Character(self.loader)
@@ -125,6 +139,9 @@ class Game:
     def update(self, dt):
 
         self.player.update(dt)
+        self.wisp.update(dt, self.player._pos)
+        self.goblin.update(dt, self.player._rect)
+        self.crystal.update(dt)
 
     # -----------------------
     # COLLISION
@@ -133,6 +150,7 @@ class Game:
     def check_collision(self):
 
         self.player.check_collision()
+        self.goblin.check_collision()
 
     # -----------------------
     # DRAW
@@ -143,6 +161,9 @@ class Game:
         self._screen.fill(COLOR_BLACK)
 
         self.player.draw(self._screen)
+        self.wisp.draw(self._screen)
+        self.goblin.draw(self._screen)
+        self.crystal.draw(self._screen)
 
         scaled = pygame.transform.scale(
             self._screen,
