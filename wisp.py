@@ -70,7 +70,7 @@ class Wisp:
     def get_rect(self):
         return self._rect
     
-class Goblin():
+class Goblin:
     def __init__(self, x, y, loader):
         self._animations = {
             "idle": loader.get_animation("goblin_idle"),
@@ -220,7 +220,32 @@ class Goblin():
         
         return see
     
-import math
+class Item:
+    def __init__(self, loader, name, pos):
+        self._pop = False
+        self._pop_duration = 0.8
+        self._pop_height = 40
+        self._pop_timer = 0
+        self._image = loader.get_animation(name)[0]
+        self._rect = self._image.get_rect(center=pos)
+
+    def update(self, dt):
+        if self._pop:
+            self._pop_timer += dt
+
+            if self._pop_timer >= self._pop_duration:
+                self._pop_timer = self._pop_duration
+
+    def draw(self, screen):
+        offset_y = 0
+        if self._pop:
+            progress = self._pop_timer / self._pop_duration
+            offset_y = -self._pop_height * math.sin(progress * math.pi)
+
+        draw_pos = (self._rect.centerx, self._rect.centery + offset_y)
+        if self._pop:
+            item_rect = self._image.get_rect(center=draw_pos)
+            screen.blit(self._image, item_rect)
 
 class Crystal:
     """
@@ -231,10 +256,6 @@ class Crystal:
         frames = loader.get_animation("crystal")
         self._death_frames = loader.get_animation("big_bomb_effect")
         self._alive = True
-        self._item_pop = False
-        self._item_pop_duration = 8
-        self._item_pop_height = 10
-        self._pop_timer = 0
         self._image_index = 0
         self._frame_speed = 8
         self._frame_timer = 0
@@ -244,71 +265,64 @@ class Crystal:
         self._hit = False
         index = c_type % len(frames)
         self._frame = [frames[index]]
-        if index == 0:
-            self._item = loader.get_animation("mp_item")
-        elif index == 1:
-            self._item = loader.get_animation("hp_item")
         
         self._health = 100
 
         self._image = self._frame[0]
-        self._pos = (150, 150)
+        self._pos = pygame.Vector2(150, 150)
         self._rect = self._image.get_rect(center=self._pos)
+        self._blank = False
+
+        if index == 0:
+            self._item = Item(loader, "mp_item", self._pos)
+        else:
+            self._item = Item(loader, "hp_item", self._pos)
 
     def update(self, dt):
-        if self._alive and self.is_hit():
-            self._hit = True
-            self._shake_timer = 0
-            self._health -= 20
-
-        if self._health <= 0 and self._alive:
-            self._alive = False
-            self._frame_timer = 0
-            self._image_index = 0
-            self._image = self._death_frames[0]
-
-        self._frame_timer += dt
-        if self._frame_timer > 1 / self._frame_speed:
-            self._frame_timer = 0
-            self._image_index += 1
-            if self._alive:
-                self._image_index = 0
-            elif self._image_index < len(self._death_frames):
-                self._image = self._death_frames[self._image_index]
-            else:
-                # pop the item out
-                self._item_pop = True
-                self._image = self._item[0]
-
-        # update shake timer if alive
-        if self._hit and self._alive:
-            self._shake_timer += dt
-
-            if self._shake_timer > 1 / self._shake_duration:
+        if not self._blank:
+            if self._alive and self.is_hit():
+                self._hit = True
                 self._shake_timer = 0
-                self._hit = False
-        
-        if self._item_pop:
-            self._pop_timer += dt
+                self._health -= 20
 
-            if self._pop_timer >= 1 / self._item_pop_duration:
-                self._pop_timer = 1 / self._item_pop_duration
-                self._item_pop = False
+            if self._health <= 0 and self._alive:
+                self._alive = False
+                self._frame_timer = 0
+                self._image_index = 0
+                self._image = self._death_frames[0]
+                self._item._pop = True
+
+            self._frame_timer += dt
+            if self._frame_timer > 1 / self._frame_speed:
+                self._frame_timer = 0
+                self._image_index += 1
+                if self._alive:
+                    self._image_index = 0
+                elif self._image_index < len(self._death_frames):
+                    self._image = self._death_frames[self._image_index]
+                else:
+                    self._blank = True
+
+            # update shake timer if alive
+            if self._hit and self._alive:
+                self._shake_timer += dt
+
+                if self._shake_timer > 1 / self._shake_duration:
+                    self._shake_timer = 0
+                    self._hit = False
+        self._item.update(dt)
 
     def draw(self, screen):
-        offset_x = 0
-        offset_y = 0
-        if self._hit and self._alive:
-            # sine wave jiggle
-            offset_x = int(math.sin(self._shake_timer * 20) * self._shake_strength)
-        
-        if self._item_pop:
-            progress = self._pop_timer * self._item_pop_duration
-            offset_y = - self._item_pop_height * (1 - progress)
+        if not self._blank:
+            offset_x = 0
+            if self._hit and self._alive:
+                # sine wave jiggle
+                offset_x = int(math.sin(self._shake_timer * 20) * self._shake_strength)
 
-        draw_pos = (self._rect.centerx + offset_x, self._rect.centery + offset_y)
-        rect = self._image.get_rect(center=draw_pos)
-        screen.blit(self._image, rect)
+            draw_pos = (self._rect.centerx + offset_x, self._rect.centery)
+            rect = self._image.get_rect(center=draw_pos)
+            screen.blit(self._image, rect)
+        self._item.draw(screen)
 
     def is_hit(self):
         """simple random hit"""
