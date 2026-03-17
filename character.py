@@ -43,6 +43,7 @@ class Character:
         self._jumpMaxHold = self._jumpholdDuration
         self._wasMoving = False
         self._crouching = False
+        self._turning = False
 
         # dash placeholder    
         self._dashCD = 0.0
@@ -205,8 +206,6 @@ class Character:
         # attack
         attackPressed = keys[self._keys["attack"]]
         attackJustPressed = attackPressed and not self._attackPressedLastFrame
-        upPressed = keys[self._keys["up"]]
-        downPressed = keys[self._keys["down"]]
 
         if attackJustPressed and not self._attacking:
             if not self._grounded:
@@ -474,7 +473,7 @@ class Character:
                 turning = True
             elif self._vel.x < 0 and self._facingRight:
                 turning = True
-        if not self._attacking:
+        if not self._grounded:
             if self._inputDir > 0:
                 self._facingRight = True
             elif self._inputDir < 0:
@@ -547,8 +546,8 @@ class Character:
                     elif self._inputDir < 0 and self._facingRight:
                         turning = True
 
-                if turning and self._directionLockTimer <= 0:
-                        # flip immediately
+                if turning and self._grounded:
+                    # flip immediately
                     if self._inputDir > 0:
                         self._facingRight = True
                     elif self._inputDir < 0:
@@ -621,6 +620,7 @@ class Character:
                 if self.frame_index < len(self.frames) - 1:
                     self.frame_index += 1
                 else:
+                    self._turning = False
                     self.set_animation("run")
 
             elif (
@@ -888,5 +888,3 @@ class Character:
         self.frame_speed = self.time_stop_frame_speed
         frames = self.animations[anim]
         self.time_stop_timer = len(frames) * self.frame_speed
-
-
