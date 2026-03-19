@@ -58,6 +58,7 @@ class Character:
         self._wasMoving = False
         self._crouching = False
         self._turning = False
+        self._dead = False
 
         # dash placeholder    
         self._dashCD = 0.0
@@ -105,7 +106,8 @@ class Character:
             "time_stop": trim_top(loader.get_animation("player_time_stop")),
             "time_stop_air": loader.get_animation("player_time_stop_air"),
             "player_damage": loader.get_animation("player_damage"),
-            "player_fall_downn": loader.get_animation("player_fall_down")
+            "player_fall_down": loader.get_animation("player_fall_down"),
+            "player_des": loader.get_animation("player_des"),
         }
 
         # special effects
@@ -206,11 +208,21 @@ class Character:
 
         self.time_stop_wave_reverse = False 
 
+        # taking damage
+        self._takingDamage = False
+        self._damageLock = False  
+        self._knockbackVel = pygame.Vector2(0, 0)
+
     # -----------------------
     # INPUT
     # -----------------------
 
     def handleInput(self, keys):
+        if self._dead:
+            return
+        if self._damageLock:
+            return
+
         # time stop
         stopPressed = keys[self._keys["stop"]]
         stopJustPressed = stopPressed and not self._stopPressedLastFrame
@@ -312,6 +324,31 @@ class Character:
     # -----------------------
 
     def update(self, dt):
+        # 2nd jump effect 2
+        for effect in self.double_jump_effects[:]:
+            effect["timer"] += dt
+            if effect["timer"] >= effect["speed"]:
+                effect["timer"] = 0
+                effect["frame"] += 1
+            if effect["frame"] >= len(effect["frames"]):
+                self.double_jump_effects.remove(effect) 
+
+        # attack effect
+        for effect in self.attack_effects[:]:
+            effect["timer"] += dt
+            if effect["timer"] >= effect["speed"]:
+                effect["timer"] = 0
+                effect["frame"] += 1
+
+            if effect["frame"] >= len(effect["frames"]):
+                self.attack_effects.remove(effect)
+
+        if self._dead and not self._takingDamage:
+            self.update_death(dt)
+            return
+        if self._takingDamage:
+            self.update_damage(dt)
+            return
 
         if self.time_stop_toggle_lock > 0:
             self.time_stop_toggle_lock -= dt
@@ -354,28 +391,6 @@ class Character:
                 self.time_stop_startup = False
                 self.time_stop = True
                 self.time_stop_timer = self.time_stop_duration
-            # --- update double jump effects even during time stop ---
-            for effect in self.double_jump_effects[:]:
-
-                effect["timer"] += dt
-
-                if effect["timer"] >= effect["speed"]:
-                    effect["timer"] = 0
-                    effect["frame"] += 1
-
-                if effect["frame"] >= len(effect["frames"]):
-                    self.double_jump_effects.remove(effect)
-            # --- update attack effects even during time stop ---
-            for effect in self.attack_effects[:]:
-
-                effect["timer"] += dt
-
-                if effect["timer"] >= effect["speed"]:
-                    effect["timer"] = 0
-                    effect["frame"] += 1
-
-                if effect["frame"] >= len(effect["frames"]):
-                    self.attack_effects.remove(effect)
 
             return
         
@@ -399,28 +414,7 @@ class Character:
             if self.time_stop_ending_timer <= 0:
                 self.time_stop_ending = False
                 self.game.time_stop = False   # unfreeze world
-            # --- update double jump effects even during time stop ---
-            for effect in self.double_jump_effects[:]:
 
-                effect["timer"] += dt
-
-                if effect["timer"] >= effect["speed"]:
-                    effect["timer"] = 0
-                    effect["frame"] += 1
-
-                if effect["frame"] >= len(effect["frames"]):
-                    self.double_jump_effects.remove(effect)
-            # --- update attack effects even during time stop ---
-            for effect in self.attack_effects[:]:
-
-                effect["timer"] += dt
-
-                if effect["timer"] >= effect["speed"]:
-                    effect["timer"] = 0
-                    effect["frame"] += 1
-
-                if effect["frame"] >= len(effect["frames"]):
-                    self.attack_effects.remove(effect)
             return
 
         # time stop freeze
@@ -454,29 +448,6 @@ class Character:
                 if self.frame_index < len(self.frames) - 1:
                     self.frame_index += 1
             self._image = self.frames[self.frame_index]
-            # --- update double jump effects even during time stop ---
-            for effect in self.double_jump_effects[:]:
-
-                effect["timer"] += dt
-
-                if effect["timer"] >= effect["speed"]:
-                    effect["timer"] = 0
-                    effect["frame"] += 1
-
-                if effect["frame"] >= len(effect["frames"]):
-                    self.double_jump_effects.remove(effect)
-            # --- update attack effects even during time stop ---
-            for effect in self.attack_effects[:]:
-
-                effect["timer"] += dt
-
-                if effect["timer"] >= effect["speed"]:
-                    effect["timer"] = 0
-                    effect["frame"] += 1
-
-                if effect["frame"] >= len(effect["frames"]):
-                    self.attack_effects.remove(effect)
-
         
         if not self.time_stop:
             self.time_energy = min(self.time_energy_max, self.time_energy + self.time_regen_rate * dt)
@@ -861,7 +832,7 @@ class Character:
                         self.spawn_attack_effect()
 
                     else:
-                        
+
                         self._attackQueued = False
                         self._attacking = False
                         self._comboIndex = 0
@@ -890,25 +861,6 @@ class Character:
                 self.frame_index = (self.frame_index + 1) % len(self.frames)
 
         self._image = self.frames[self.frame_index]
-
-        # 2nd jump effect 2
-        for effect in self.double_jump_effects[:]:
-            effect["timer"] += dt
-            if effect["timer"] >= effect["speed"]:
-                effect["timer"] = 0
-                effect["frame"] += 1
-            if effect["frame"] >= len(effect["frames"]):
-                self.double_jump_effects.remove(effect) 
-
-        # attack effect
-        for effect in self.attack_effects[:]:
-            effect["timer"] += dt
-            if effect["timer"] >= effect["speed"]:
-                effect["timer"] = 0
-                effect["frame"] += 1
-
-            if effect["frame"] >= len(effect["frames"]):
-                self.attack_effects.remove(effect)
 
         # sync rect AGAIN after collision fix
         self._rect.midtop = (int(self._pos.x), int(self._pos.y))
@@ -1250,3 +1202,126 @@ class Character:
 
         else:
             self.mp -= self.mp_attack_cost
+
+    def take_damage(self, attacker_x):
+        if self._takingDamage:
+            return
+
+        self._takingDamage = True
+        self._damageLock = True
+
+        # cancel combat
+        self._attacking = False
+        self._attackQueued = False
+        self._currentCombo = None
+        self._comboIndex = 0
+
+        dx = self._pos.x - attacker_x
+        direction = 1 if dx > 0 else -1
+
+        self._knockbackVel.x = 150 * direction
+        self._knockbackVel.y = -300
+
+        self._grounded = False 
+
+        self.set_animation("player_damage", True)
+
+    def update_damage(self, dt):
+
+        was_grounded = self._grounded
+
+        # apply gravity to knockback
+        self._knockbackVel.y += GAME_GRAVITY * dt
+
+        # move using knockback ONLY
+        self._pos.x += self._knockbackVel.x * dt
+        self._pos.y += self._knockbackVel.y * dt
+
+        # update rect
+        self._rect.midtop = (int(self._pos.x), int(self._pos.y))
+
+        # collision
+        self.check_collision()
+
+        just_landed = not was_grounded and self._grounded
+
+        if just_landed:
+            self._knockbackVel.x = 0
+
+        self.frame_timer += dt
+
+        # --- DAMAGE ANIMATION ---
+        if self.current_anim == "player_damage":
+
+            if self.frame_timer >= self.frame_speed:
+                self.frame_timer = 0
+
+                # advance until last frame
+                if self.frame_index < len(self.frames) - 1:
+                    self.frame_index += 1
+
+                # STAY on last frame
+                else:
+                    self.frame_index = len(self.frames) - 1
+
+            # when hit ground → switch animation
+            if self._grounded:
+                self.set_animation("player_fall_down", True)
+                self.frame_speed = 0.08
+
+        # --- FALL DOWN ANIMATION ---
+        elif self.current_anim == "player_fall_down":
+
+            if self.frame_timer >= self.frame_speed:
+                self.frame_timer = 0
+
+                if self.frame_index < len(self.frames) - 1:
+                    self.frame_index += 1
+                else:
+                    # CHECK DEATH HERE
+                    if self.hp <= 0:
+                        self.set_animation("player_des", True)
+                        self.frame_speed = 0.08
+                        self._takingDamage = False
+                        return
+                    else:
+                        # normal recovery
+                        self._takingDamage = False
+                        self._damageLock = False
+
+                        if self._grounded:
+                            self.set_animation("idle", True)
+                        else:
+                            self.set_animation("fall", True)
+
+        self._image = self.frames[self.frame_index]
+
+    def apply_damage(self, damage, attacker_x):
+        # prevent damage spam
+        if self._takingDamage:
+            return
+
+        # reduce HP
+        self.hp -= damage
+        if self.hp < 0:
+            self.hp = 0
+
+        if self.hp <= 0:
+            self._dead = True
+
+        # call existing damage logic
+        self.take_damage(attacker_x)
+
+    def update_death(self, dt):
+        self.frame_timer += dt
+
+        if self.frame_timer >= self.frame_speed:
+            self.frame_timer = 0
+
+            if self.frame_index < len(self.frames) - 1:
+                self.frame_index += 1
+            else:
+                # stay on last frame (dead)
+                self.frame_index = len(self.frames) - 1
+
+        self._image = self.frames[self.frame_index]

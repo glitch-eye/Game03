@@ -68,6 +68,7 @@ class Game:
         self.loader.load_animation("flying_knife", "assets/sprite/bullet_sprite3")
         self.loader.load_animation("player_damage", "assets/sprite/player_damage")
         self.loader.load_animation("player_fall_down", "assets/sprite/player_fall_down")
+        self.loader.load_animation("player_des", "assets/sprite/player_des")
         # item and effect
         self.loader.load_animation("crystal", "assets/sprite/crystal_sprite")
         self.loader.load_animation("big_bomb_effect", "assets/sprite/big_bomb_effect")
