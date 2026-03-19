@@ -9,6 +9,8 @@ class Game:
 
     def __init__(self):
 
+        self.time_stop = False
+
         self._display = pygame.display.set_mode(
             (SCREEN_WIDTH * GAME_SCALE, SCREEN_HEIGHT * GAME_SCALE)
         )
@@ -64,6 +66,8 @@ class Game:
         self.loader.load_animation("player_time_stop", "assets/sprite/player_time_stop")
         self.loader.load_animation("player_time_stop_air", "assets/sprite/player_time_stop_air")
         self.loader.load_animation("flying_knife", "assets/sprite/bullet_sprite3")
+        self.loader.load_animation("player_damage", "assets/sprite/player_damage")
+        self.loader.load_animation("player_fall_down", "assets/sprite/player_fall_down")
 
         self.loader.load_animation("crystal", "assets/sprite/crystal_sprite")
         self.loader.load_animation("big_bomb_effect", "assets/sprite/big_bomb_effect")
@@ -145,21 +149,23 @@ class Game:
     def update(self, dt):
 
         self.player.update(dt)
-        self.wisp.update(dt, self.player._pos)
-        self.goblin.update(dt, self.player._rect)
-        self.crystal.update(dt)
 
-        for knife in self.knives:
-            knife.update(dt)
+        if not self.time_stop:
+            self.wisp.update(dt, self.player._pos)
+            self.goblin.update(dt, self.player._rect)
+            self.crystal.update(dt)
 
-        # remove dead knives
-        self.knives = [k for k in self.knives if k.alive]
+            for knife in self.knives:
+                knife.update(dt)
 
-        for knife in self.knives:
-            knife.update(dt)
+            # remove dead knives
+            self.knives = [k for k in self.knives if k.alive]
 
-        # remove dead knives
-        self.knives = [k for k in self.knives if k.alive]
+            for knife in self.knives:
+                knife.update(dt)
+
+            # remove dead knives
+            self.knives = [k for k in self.knives if k.alive]
 
     # -----------------------
     # COLLISION
@@ -178,7 +184,9 @@ class Game:
 
         self._screen.fill(COLOR_BLACK)
 
-        self.player.draw(self._screen)
+        # -----------------------
+        # DRAW WORLD (no player)
+        # -----------------------
         self.wisp.draw(self._screen)
         self.goblin.draw(self._screen)
         self.crystal.draw(self._screen)
@@ -186,11 +194,31 @@ class Game:
         for knife in self.knives:
             knife.draw(self._screen)
 
-        for knife in self.knives:
-            knife.draw(self._screen)
+        # -----------------------
+        # UI (draw BEFORE filter if you want it grayscale)
+        # -----------------------
+        energy_text = f"Time: {int(self.player.time_energy)}"
+        text_surface = self._font.render(energy_text, True, (255, 255, 255))
+        self._screen.blit(text_surface, (10, 10))
 
+        # -----------------------
+        # APPLY FILTER SAFELY
+        # -----------------------
+        if self.time_stop:
+            filtered = apply_grayscale(self._screen.copy())
+        else:
+            filtered = self._screen
+
+        # -----------------------
+        # DRAW PLAYER ON TOP (NOT FILTERED)
+        # -----------------------
+        self.player.draw(filtered)
+
+        # -----------------------
+        # SCALE + DISPLAY
+        # -----------------------
         scaled = pygame.transform.scale(
-            self._screen,
+            filtered,
             (SCREEN_WIDTH * GAME_SCALE, SCREEN_HEIGHT * GAME_SCALE)
         )
 

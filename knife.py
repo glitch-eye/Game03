@@ -22,6 +22,9 @@ class Knife:
         elif attack_type in ("up_shot", "up_shot2", "up_shot_air", "up_shot_run"):
             # straight up
             self.vel = pygame.Vector2(0, -speed)
+        elif attack_type == "down_shot":
+            # straight down
+            self.vel = pygame.Vector2(0, speed)
 
         else:
             # normal horizontal
@@ -56,7 +59,7 @@ class Knife:
         self.rect = self.image.get_rect(center=self.pos)
 
         # lifetime
-        self.life_time = 1.5
+        self.life_time = 2
         self.timer = 0
 
         # trail system
@@ -79,7 +82,7 @@ class Knife:
             "speed": 0.03,
             # spawn behind knife (based on velocity direction)
             "pos": self.pos - self.vel.normalize() * 15,
-            "scale": random.uniform(0.4, 0.7),
+            "scale": random.uniform(0.9, 1.1),
             "vel": self.vel * 0.7  # slower follow
         }
 
