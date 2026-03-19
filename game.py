@@ -119,7 +119,7 @@ class Game:
         # pygame.mixer.music.play(-1)   # -1 = loop forever
 
         # retrieve animation frames
-        self.wisp = Wisp(0, 0, self.loader.get_animation("wisp"))
+        self.wisp = Wisp(0, 0, self.loader)
         self.goblin = Goblin(0, 0, self.loader)
 
         self.crystal = Crystal(self.loader, 1)
@@ -151,9 +151,9 @@ class Game:
         self.player.update(dt)
 
         if not self.time_stop:
-            self.wisp.update(dt, self.player._pos)
-            self.goblin.update(dt, self.player._rect)
-            self.crystal.update(dt)
+            self.wisp.update(dt, self.player._pos, self.knives)
+            self.goblin.update(dt, self.player._rect, self.knives)
+            self.crystal.update(dt, self.player._pos, self.knives)
 
             for knife in self.knives:
                 knife.update(dt)
