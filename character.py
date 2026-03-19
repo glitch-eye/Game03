@@ -61,6 +61,10 @@ class Character:
         self.slide_duration = PLAYER_SLIDE_DURATION
         self.slide_speed = PLAYER_SLIDE_SPEED
 
+        # coyote time
+        self._coyoteTime = 0.12
+        self._coyoteTimer = 0
+
         # sprite
         self.animations = {
             "idle": loader.get_animation("player_idle"),
@@ -89,7 +93,9 @@ class Character:
             "under_attack": loader.get_animation("player_under_attack"),
             "slide": loader.get_animation("player_sliding"),
             "time_stop": trim_top(loader.get_animation("player_time_stop")),
-            "time_stop_air": loader.get_animation("player_time_stop_air")
+            "time_stop_air": loader.get_animation("player_time_stop_air"),
+            "player_damage": loader.get_animation("player_damage"),
+            "player_fall_downn": loader.get_animation("player_fall_down")
         }
 
         # special effects
@@ -152,22 +158,56 @@ class Character:
 
         # time stop
         self.time_stop = False
-        self.time_stop_timer = 0
         self.time_stop_frame_speed = 0.1
+        self.time_stop_duration = 100.0   # max active time
+        self.time_stop_timer = 0.0        # active timer
+        self.time_stop_ending = False
+        self.time_stop_ending_timer = 0.0
+
+        self.time_stop_startup = False    # animation lock phase
+        self.time_stop_startup_timer = 0.0
 
         self._stopPressedLastFrame = False
+        self.time_stop_toggle_lock = 0.0
+        self.time_stop_toggle_delay = 1.0
 
         self.anim_offsets = {
             "time_stop": (0, -3),       
             "time_stop_air": (-10, 0)
         }
 
+        self.time_energy = 100.0
+        self.time_energy_max = 100.0
+
+        self.time_regen_rate = 5.0       
+        self.time_drain_base = 2.0        
+        self.time_drain_move = 4.0
+        self.time_doublejump_cost = 10.0        
+
+        self.time_attack_cost = 10.0
+
+        self._moving_timer = 0.0 
+
     # -----------------------
     # INPUT
     # -----------------------
 
     def handleInput(self, keys):
-        if self.player_sliding or self.time_stop:
+        # time stop
+        stopPressed = keys[self._keys["stop"]]
+        stopJustPressed = stopPressed and not self._stopPressedLastFrame
+
+        if stopJustPressed and self.time_stop_toggle_lock <= 0:
+            if self.time_stop:
+                self.end_time_stop()
+                self.time_stop_toggle_lock = 0.5
+            elif self.time_energy > 0:
+                self.start_time_stop()
+                self.time_stop_toggle_lock = 0.5
+
+        self._stopPressedLastFrame = stopPressed
+
+        if self.player_sliding or self.time_stop_startup:
             return
 
         # crouch input (only allowed on ground)
@@ -199,18 +239,17 @@ class Character:
 
         self._jumpPressedLastFrame = jumpPressed
 
-        # time stop
-        stopPressed = keys[self._keys["stop"]]
-        stopJustPressed = stopPressed and not self._stopPressedLastFrame
-        if stopJustPressed and not self.time_stop:
-            self.start_time_stop()
-        self._stopPressedLastFrame = stopPressed
-
         # attack
         attackPressed = keys[self._keys["attack"]]
         attackJustPressed = attackPressed and not self._attackPressedLastFrame
 
         if attackJustPressed and not self._attacking:
+            if self.time_stop:
+                self.time_energy -= self.time_attack_cost
+                if self.time_energy <= 0:
+                    self.time_energy = 0
+                    self.time_stop = False
+                    self.game.time_stop = False
             if not self._grounded:
                 if self._inputUp:
                     self.start_attack("air_up")
@@ -219,7 +258,6 @@ class Character:
                 else:
                     self.start_attack("air")
             else:
-
                 if self._inputUp and abs(self._vel.x) > 0:
                     self.start_attack("run_up")
                 elif self._inputUp:
@@ -258,15 +296,126 @@ class Character:
 
     def update(self, dt):
 
+        if self.time_stop_toggle_lock > 0:
+            self.time_stop_toggle_lock -= dt
+
         if self._knifeCooldown > 0:
             self._knifeCooldown -= dt
 
-        # time stop freeze
-        if self.time_stop:
-            self.time_stop_timer -= dt
-            # freeze movement
+        # time stop wind up
+        if self.time_stop_startup:
+            self.time_stop_startup_timer -= dt
+
+            # lock player completely
             self._vel.x = 0
             self._vel.y = 0
+
+            # animate
+            self.frame_timer += dt
+            if self.frame_timer >= self.frame_speed:
+                self.frame_timer = 0
+                if self.frame_index < len(self.frames) - 1:
+                    self.frame_index += 1
+
+            self._image = self.frames[self.frame_index]
+
+            # when animation finishes → enter real timestop
+            if self.time_stop_startup_timer <= 0:
+                self.time_stop_startup = False
+                self.time_stop = True
+                self.time_stop_timer = self.time_stop_duration
+            # --- update double jump effects even during time stop ---
+            for effect in self.double_jump_effects[:]:
+
+                effect["timer"] += dt
+
+                if effect["timer"] >= effect["speed"]:
+                    effect["timer"] = 0
+                    effect["frame"] += 1
+
+                if effect["frame"] >= len(effect["frames"]):
+                    self.double_jump_effects.remove(effect)
+            # --- update attack effects even during time stop ---
+            for effect in self.attack_effects[:]:
+
+                effect["timer"] += dt
+
+                if effect["timer"] >= effect["speed"]:
+                    effect["timer"] = 0
+                    effect["frame"] += 1
+
+                if effect["frame"] >= len(effect["frames"]):
+                    self.attack_effects.remove(effect)
+
+            return
+        
+        # time stop ending (cancel animation)
+        if self.time_stop_ending:
+            self.time_stop_ending_timer -= dt
+
+            # lock player
+            self._vel.x = 0
+            self._vel.y = 0
+
+            # animate
+            self.frame_timer += dt
+            if self.frame_timer >= self.frame_speed:
+                self.frame_timer = 0
+                if self.frame_index < len(self.frames) - 1:
+                    self.frame_index += 1
+
+            self._image = self.frames[self.frame_index]
+
+            if self.time_stop_ending_timer <= 0:
+                self.time_stop_ending = False
+                self.game.time_stop = False   # unfreeze world
+            # --- update double jump effects even during time stop ---
+            for effect in self.double_jump_effects[:]:
+
+                effect["timer"] += dt
+
+                if effect["timer"] >= effect["speed"]:
+                    effect["timer"] = 0
+                    effect["frame"] += 1
+
+                if effect["frame"] >= len(effect["frames"]):
+                    self.double_jump_effects.remove(effect)
+            # --- update attack effects even during time stop ---
+            for effect in self.attack_effects[:]:
+
+                effect["timer"] += dt
+
+                if effect["timer"] >= effect["speed"]:
+                    effect["timer"] = 0
+                    effect["frame"] += 1
+
+                if effect["frame"] >= len(effect["frames"]):
+                    self.attack_effects.remove(effect)
+            return
+
+        # time stop freeze
+        if self.time_stop:
+            # --- energy drain ---
+            drain = self.time_drain_base
+
+            # moving drain
+            if abs(self._vel.x) > 0:
+                drain += self.time_drain_move
+
+            self.time_energy -= drain * dt
+
+            # auto stop if empty
+            if self.time_energy <= 0:
+                self.time_energy = 0
+                self.time_stop = False
+                self.game.time_stop = False
+
+            self.time_stop_timer -= dt
+
+            if self.time_stop_timer <= 0:
+                self.time_stop = False
+                self.game.time_stop = False
+
             # advance animation timer
             self.frame_timer += dt
             if self.frame_timer >= self.frame_speed:
@@ -297,17 +446,12 @@ class Character:
 
                 if effect["frame"] >= len(effect["frames"]):
                     self.attack_effects.remove(effect)
-            if self.time_stop_timer <= 0:
-                self.time_stop = False
-                self.frame_speed = 0.07
-                if self._grounded:
-                    self.set_animation("idle")
-                else:
-                    if self._vel.y < 0:
-                        self.set_animation("jump")
-                    else:
-                        self.set_animation("fall")
-            return
+
+        
+        if not self.time_stop:
+            self.time_energy = min(self.time_energy_max, self.time_energy + self.time_regen_rate * dt)
+            if self.time_energy > self.time_energy_max:
+                self.time_energy = self.time_energy_max
 
         was_grounded = self._grounded
 
@@ -335,10 +479,23 @@ class Character:
                 # reset if player releases or matches direction
                 self._turnHoldTimer = 0
 
+                # sync rect BEFORE collision
+        self._rect.midtop = (int(self._pos.x), int(self._pos.y))
+
+        # collision
+        self.check_collision()
+
+        if self._grounded:
+            self._coyoteTimer = self._coyoteTime
+        else:
+            self._coyoteTimer = max(0, self._coyoteTimer - dt)
+
+        just_landed = not was_grounded and self._grounded
+
         # execute buffered jump if possible
         if self._jumpBufferTimer > 0: # Remove later when couch+jump allows sliding
 
-            if self._grounded:
+            if self._grounded or self._coyoteTimer > 0:
 
                 if self._inputDown and not self.player_sliding:
 
@@ -362,16 +519,33 @@ class Character:
                 self._grounded = False
                 self._jumpTimes = 1
 
+                self._coyoteTimer = 0
                 self._jumpBufferTimer = 0
 
 
             elif self._jumpTimes < 2:
+
+                if self.time_stop:
+                    # CHECK ENERGY FIRST
+                    if self.time_energy < self.time_doublejump_cost:
+                        self._jumpBufferTimer = 0
+                        return
+
+                    # APPLY COST
+                    self.time_energy -= self.time_doublejump_cost
+
+                    # auto cancel timestop if empty
+                    if self.time_energy <= 0:
+                        self.time_energy = 0
+                        self.time_stop = False
+                        self.game.time_stop = False
 
                 self._vel.y = -self._doublejumpForce
                 self._jumpMaxHold = self._doublejumpholdDuration
 
                 self._curJumpHold = 0
                 self._jumpTimes = 2
+                self.spawn_downward_knives()
                 self._jumpHolding = True
 
                 self.double_jump_trail_active = True
@@ -485,31 +659,6 @@ class Character:
                 self._facingRight = True
             elif self._inputDir < 0:
                 self._facingRight = False
-
-        # sync rect BEFORE collision
-        self._rect.midtop = (int(self._pos.x), int(self._pos.y))
-
-        # collision
-        self.check_collision()
-
-        just_landed = not was_grounded and self._grounded
-
-        # convert ground attack into air attack if we leave the ground
-        if self._attacking and not self._grounded:
-            if self.current_anim.startswith(("action", "run_attack")):
-                if self._inputDown:
-                    self.set_animation("under_attack", True)
-                else:
-                    self.set_animation("jump_attack", True)
-        # convert air attack into ground attack when landing
-        if self._attacking and just_landed:
-            if self.current_anim in ("jump_attack", "under_attack"):
-                self._attacking = False
-                self._comboIndex = 0
-                if abs(self._vel.x) > 0:
-                    self.set_animation("run")
-                else:
-                    self.set_animation("idle")
 
         # state change
         if self._attacking:
@@ -680,15 +829,23 @@ class Character:
                         self._comboIndex = 0
                         self.frame_speed = 0.07
 
-                        isMoving = abs(self._vel.x) > 0
-                        if isMoving:
-                            self.set_animation("run")
-                        elif self._wasMoving:
-                            # player stopped moving during the attack
-                            self.set_animation("run_stop")
+                        if not self._grounded:
+                            if self._gliding:
+                                self.set_animation("glide")
+                            elif self._vel.y < 0:
+                                self.set_animation("jump")
+                            else:
+                                self.set_animation("fall")
                         else:
-                            self.set_animation("idle")
-                        self._wasMoving = isMoving
+                            isMoving = abs(self._vel.x) > 0
+                            if isMoving:
+                                self.set_animation("run")
+                            elif self._wasMoving:
+                                self.set_animation("run_stop")
+                            else:
+                                self.set_animation("idle")
+
+                        self._wasMoving = abs(self._vel.x) > 0
 
             else:
                 # normal looping animation
@@ -888,28 +1045,109 @@ class Character:
     def start_time_stop(self):
         if self.time_stop:
             return
-        self.time_stop = True
-        if self._grounded:
-            anim = "time_stop"
-        else:
-            anim = "time_stop_air"
+
+        self.game.time_stop = True
+
+        # FORCE CANCEL ATTACK
+        self._attacking = False
+        self._attackQueued = False
+        self._comboIndex = 0
+
+        # reset knife spawn so it doesn't fire mid-cancel
+        self._knifeSpawned = False
+
+        # STARTUP phase only
+        self.time_stop = False
+        self.time_stop_startup = True
+
+        anim = "time_stop" if self._grounded else "time_stop_air"
         self.set_animation(anim, True)
-        # slower animation speed
+
         self.frame_speed = self.time_stop_frame_speed
         frames = self.animations[anim]
-        self.time_stop_timer = len(frames) * self.frame_speed
+        self.time_stop_startup_timer = len(frames) * self.frame_speed
+
+
+    def end_time_stop(self):
+        if not self.time_stop:
+            return
+        self.time_stop = False
+        self.time_stop_ending = True
+
+        # FORCE CANCEL ATTACK
+        self._attacking = False
+        self._attackQueued = False
+        self._comboIndex = 0
+
+        # reset to a safe animation immediately
+        if not self._grounded:
+            if self._vel.y < 0:
+                self.set_animation("jump", True)
+            else:
+                self.set_animation("fall", True)
+        else:
+            if abs(self._vel.x) > 0:
+                self.set_animation("run", True)
+            else:
+                self.set_animation("idle", True)
+
+        anim = "time_stop" if self._grounded else "time_stop_air"
+        self.set_animation(anim, True)
+
+        self.frame_speed = self.time_stop_frame_speed
+        frames = self.animations[anim]
+        self.time_stop_ending_timer = len(frames) * self.frame_speed
 
     def spawn_knives(self):
         self._knifeCooldown = self._knifeCooldownTime
-
         direction = 1 if self._facingRight else -1
+        center_x = self._pos.x + self._rect.width // 2
+        center_y = self._pos.y + self._rect.height // 2
+        offset = 16
+        dx, dy = 0, 0
+        # --- determine direction based on animation ---
+        if self.current_anim in ("up_shot", "up_shot2", "up_shot_run", "up_shot_air"):
+            dx = 0
+            dy = -offset
+        elif self.current_anim == "under_attack":
+            dx = direction * offset
+            dy = offset   # 45° down
+        else:
+            # default horizontal
+            dx = direction * offset
+            dy = 0
+        offset_range = 5
+        rand_x = random.randint(-offset_range, offset_range)
+        rand_y = random.randint(-offset_range, offset_range)
 
-        base_pos = self._rect.center
-
+        base_pos = (center_x + dx + rand_x, center_y + dy + rand_y)
         knives = [
-            Knife(base_pos, direction, self.loader, attack_type=self.current_anim, y_offset=-15, forward_offset=5),
-            Knife(base_pos, direction, self.loader, attack_type=self.current_anim, y_offset=0, forward_offset=15),
-            Knife(base_pos, direction, self.loader, attack_type=self.current_anim, y_offset=15, forward_offset=-5),
-        ]
+            Knife(base_pos, direction, self.loader,
+                attack_type=self.current_anim, y_offset=-15, forward_offset=5),
 
+            Knife(base_pos, direction, self.loader,
+                attack_type=self.current_anim, y_offset=0, forward_offset=15),
+
+            Knife(base_pos, direction, self.loader,
+                attack_type=self.current_anim, y_offset=15, forward_offset=-5),
+        ]
+        self.game.knives.extend(knives)
+
+    def spawn_downward_knives(self):
+        offset_range = 5
+        rand_x = random.randint(-offset_range, offset_range)
+        rand_y = random.randint(-offset_range, offset_range)
+
+        base_pos = (
+            self._rect.centerx + rand_x,
+            self._rect.centery + rand_y
+        )
+        knives = [
+            Knife(base_pos, 1, self.loader, attack_type="down_shot",
+                y_offset=-15, forward_offset=5),
+            Knife(base_pos, 1, self.loader, attack_type="down_shot",
+                y_offset=0, forward_offset=15),
+            Knife(base_pos, 1, self.loader, attack_type="down_shot",
+                y_offset=15, forward_offset=-5),
+        ]
         self.game.knives.extend(knives)

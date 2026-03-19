@@ -10,7 +10,7 @@ class Wisp:
 
         # position
         self._pos = pygame.Vector2(x, y)
-        self._speed = 35
+        self._speed = 50
 
         # animation
         self._normal_frames = loader.get_animation("wisp")
@@ -44,7 +44,7 @@ class Wisp:
 
         if self._alive:
             # direction to player
-            direction = pygame.Vector2(player_pos) - self._pos
+            direction = pygame.Vector2(player_pos) - self._pos + (16,32)
             distance = direction.length()
 
             if distance > 0:

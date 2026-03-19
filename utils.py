@@ -46,3 +46,15 @@ def trim_top(frames):
         trimmed.append(trimmed_frame)
 
     return trimmed
+
+def apply_grayscale(surface):
+    arr = pygame.surfarray.array3d(surface)
+
+    # luminance formula
+    gray = (0.299 * arr[:,:,0] + 0.587 * arr[:,:,1] + 0.114 * arr[:,:,2]).astype("uint8")
+
+    arr[:,:,0] = gray
+    arr[:,:,1] = gray
+    arr[:,:,2] = gray
+
+    return pygame.surfarray.make_surface(arr)
