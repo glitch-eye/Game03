@@ -17,8 +17,12 @@ map_tiles, collision_tiles = build_map()
 INDEX_MAP = load_map_from_excel()
 
 # camera offset (pixel)
-cam_x = 0
-cam_y = 0
+class Position:
+    def __init__(self):
+        self.x = 360
+        self.y = 1260
+
+pos = Position()
 
 running = True
 clock = pygame.time.Clock()
@@ -30,13 +34,13 @@ while running:
 
     keys = pygame.key.get_pressed()
     if keys[pygame.K_RIGHT]:
-        cam_x -= VELOCITY
+        pos.x -= VELOCITY
     if keys[pygame.K_LEFT]:
-        cam_x += VELOCITY
+        pos.x += VELOCITY
     if keys[pygame.K_UP]:
-        cam_y += VELOCITY
+        pos.y += VELOCITY
     if keys[pygame.K_DOWN]:
-        cam_y -= VELOCITY
+        pos.y -= VELOCITY
 
     # giới hạn camera không ra khỏi bản đồ
     if INDEX_MAP:
@@ -45,14 +49,7 @@ while running:
         map_w = cols * TILE_SIZE
         map_h = rows * TILE_SIZE
 
-        if map_w > WIDTH:
-            cam_x = max(min(cam_x, 0), WIDTH - map_w)
-        else:
-            cam_x = 0
-        if map_h > HEIGHT:
-            cam_y = max(min(cam_y, 0), HEIGHT - map_h)
-        else:
-            cam_y = 0
+        
 
     screen.blit(BG, (0, 0))                      # vẽ nền
     load_map(screen, INDEX_MAP, map_tiles, (cam_x, cam_y))  # vẽ map đã scroll

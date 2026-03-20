@@ -6,8 +6,10 @@ import os
 import re
 import csv
 TILE_SIZE = 36
-INDEX_MAP = [[0 for _ in range(100)] for _ in range(40)]
+MAP_NUMS = (120, 40)
+INDEX_MAP = [[0 for _ in range(MAP_NUMS[0])] for _ in range(MAP_NUMS[1])]
 
-WIDTH, HEIGHT = 720, 480
+
+WIDTH, HEIGHT = 900, 480
 
 VELOCITY = 10

@@ -76,8 +76,8 @@ def load_map_from_excel(file_path = "map.csv"):
     game_map = []
     
     if not os.path.exists(file_path):
-        print(f"Lỗi: Không tìm thấy file {file_path}. Đang tạo mảng trống 40x100.")
-        return [[0 for _ in range(100)] for _ in range(40)]
+        print(f"Lỗi: Không tìm thấy file {file_path}. Đang tạo mảng trống 40x120.")
+        return [[0 for _ in range(MAP_NUMS[0])] for _ in range(MAP_NUMS[1])]
 
     try:
         with open(file_path, mode='r', encoding='utf-8-sig') as f:
@@ -98,11 +98,28 @@ def load_map_from_excel(file_path = "map.csv"):
         return None
 def handle_value(cell : str):
     if cell == '':
-        return 0
+        return 0 
     elif len(cell.split(',')) > 1:
         ds = cell.split(',')
         return list(int(x) for x in ds)
+    elif not cell.isnumeric():
+        return 0
     return int(cell)
 def build_background():
     bg = pygame.image.load("assets/background/background_sprite_0.png")
     return pygame.transform.scale(bg, (WIDTH, HEIGHT))
+
+def resolve_yinyang():
+    pass
+
+class Map:
+    def __init__(self):
+        black = True
+        collision_map = [[ 0 for _ in range (MAP_NUMS[0])] for _ in range (MAP_NUMS[1])]
+
+    def check_collision(self, position):
+        pass
+    
+    def build_collision(self, index_map):
+        pass
+    
