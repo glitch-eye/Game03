@@ -4,7 +4,14 @@ from wisp import *
 from asset_loader import AssetLoader
 import pygame
 import sys
+from build import *
 
+class Position:
+    def __init__(self):
+        self.x = 36*35
+        self.y = 360
+
+pos = Position()
 class Game:
 
     def __init__(self):
@@ -26,6 +33,7 @@ class Game:
         self.player = None
         self.wisp = None   # store animation frames
         self.goblin = None
+        
 
     # -----------------------
     # ASSET LOADING
@@ -131,6 +139,12 @@ class Game:
         # create entities AFTER assets exist
         self.player = Character(self.loader, self)
 
+        self.BG = build_background()
+        self.map_tiles, self.collision_tiles = build_map()
+        self.INDEX_MAP = load_map_from_excel()
+        self.collision_map = Map()
+        self.player.set_map(self.collision_map)
+
     # -----------------------
     # INPUT
     # -----------------------
@@ -144,14 +158,27 @@ class Game:
 
         keypressed = pygame.key.get_pressed()
 
+        if keypressed[pygame.K_RIGHT]:
+            pos.x += 10
+            pos.x = min(pos.x, MAP_NUMS[0]*TILE_SIZE)
+        if keypressed[pygame.K_LEFT]:
+            pos.x -= 10
+            pos.x = max(pos.x, 0)
+        if keypressed[pygame.K_UP]:
+            pos.y -= 10
+            pos.y = max(pos.y, 0)
+        if keypressed[pygame.K_DOWN]:
+            pos.y += 10
+            pos.y = min(pos.y, MAP_NUMS[1]*TILE_SIZE)
         self.player.handleInput(keypressed)
+        
 
     # -----------------------
     # UPDATE
     # -----------------------
 
     def update(self, dt):
-
+        self.collision_map.update_position(pos, pygame.Rect(0,0,40,40), pygame.Vector2(10,10))
         self.player.update(dt)
 
         if not self.time_stop:
@@ -185,9 +212,29 @@ class Game:
     # -----------------------
 
     def draw(self):
-
         self._screen.fill(COLOR_BLACK)
+        self._screen.blit(self.BG, (0,0))
+        
+        # Update camera position to follow player
+        pos.x = self.player._pos.x
+        pos.y = self.player._pos.y
+        
+        load_map(self._screen, self.INDEX_MAP, self.map_tiles, pos)
+        self.collision_map.load_collision_map(self._screen, self.INDEX_MAP, self.collision_tiles, pos)
 
+        # camera_x = min(max(pos.x - SCREEN_WIDTH // 2, 0), MAP_NUMS[0]*TILE_SIZE - SCREEN_WIDTH)
+        # camera_y = min(max(pos.y - SCREEN_HEIGHT // 2, 0), MAP_NUMS[1]*TILE_SIZE - SCREEN_HEIGHT)
+        # x,y = SCREEN_WIDTH//2 , SCREEN_HEIGHT//2
+        # if camera_x == 0:
+        #     x = pos.x
+        # if camera_x == MAP_NUMS[0]*TILE_SIZE - SCREEN_WIDTH:
+        #     x = pos.x%SCREEN_WIDTH
+        # if camera_y == 0:
+        #     y = pos.y
+        # if camera_y == MAP_NUMS[1]*TILE_SIZE - SCREEN_HEIGHT:
+        #     y = pos.y%SCREEN_HEIGHT
+        
+        # pygame.draw.rect(self._screen, (255, 0, 0), (x, y, 40, 40))
         # -----------------------
         # DRAW WORLD (no player)
         # -----------------------
@@ -292,7 +339,7 @@ class Game:
         # DRAW PLAYER ON TOP (NOT FILTERED)
         # -----------------------
         self.player.draw(filtered)
-
+        
         # -----------------------
         # SCALE + DISPLAY
         # -----------------------
@@ -301,6 +348,7 @@ class Game:
             (SCREEN_WIDTH * GAME_SCALE, SCREEN_HEIGHT * GAME_SCALE)
         )
 
+        
         self._display.blit(scaled, (0,0))
         pygame.display.flip()
     

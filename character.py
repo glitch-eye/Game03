@@ -6,6 +6,7 @@ from pygame.locals import *
 from settings import *
 from utils import *
 from knife import *
+from build import *
 import random
 
 class Character:
@@ -24,6 +25,7 @@ class Character:
 
         self.game = game
         self.loader = loader
+        self.map = None
 
         #stats
         self._pos = PLAYER_INIT_POS
@@ -73,7 +75,7 @@ class Character:
         self.slide_speed = PLAYER_SLIDE_SPEED
 
         # coyote time
-        self._coyoteTime = 0.12
+        self._coyoteTime = 0.2
         self._coyoteTimer = 0
 
         # sprite
@@ -278,7 +280,7 @@ class Character:
                 return
             self.pay_attack_cost()            
 
-            if not self._grounded:
+            if not self._grounded and self._coyoteTimer == 0:
                 if self._inputUp:
                     self.start_attack("air_up")
                 elif self._inputDown:
@@ -480,18 +482,9 @@ class Character:
                 # reset if player releases or matches direction
                 self._turnHoldTimer = 0
 
-                # sync rect BEFORE collision
-        self._rect.midtop = (int(self._pos.x), int(self._pos.y))
+        # Note: collision check moved to AFTER position update (see below)
 
-        # collision
-        self.check_collision()
-
-        if self._grounded:
-            self._coyoteTimer = self._coyoteTime
-        else:
-            self._coyoteTimer = max(0, self._coyoteTimer - dt)
-
-        just_landed = not was_grounded and self._grounded
+        #  (coyote timer and just_landed will be calculated after position update & collision check)
 
         # execute buffered jump if possible
         if self._jumpBufferTimer > 0: # Remove later when couch+jump allows sliding
@@ -589,18 +582,33 @@ class Character:
                     self._jumpTimes = 1
                     self._jumpBufferTimer = 0
 
-        # glide detection
-        self._gliding = False
-
-        if not self._grounded and self._vel.y > 0 and self._jumpHeld:
-            self._gliding = True
+        # glide detection - MOVED to after collision check (see below)
+        # Will be recalculated after position update and collision check
 
         if self._dash:
+
             self._pos.x += self._dashSpeed * dt * (self._vel.x / abs(self._vel.x))
             self._dash = False
         else:
             self._pos.x += self._vel.x * dt
         self._pos.y += self._vel.y * dt
+
+        # ===== COLLISION CHECK AFTER POSITION UPDATE =====
+        self._rect.midtop = (int(self._pos.x), int(self._pos.y))
+        self.check_collision()
+        
+        # Update coyote and just_landed after collision check
+        if self._grounded:
+            self._coyoteTimer = self._coyoteTime
+        else:
+            self._coyoteTimer = max(0, self._coyoteTimer - dt)
+        
+        just_landed = not was_grounded and self._grounded
+
+        # ===== GLIDE DETECTION (after collision check with updated _grounded) =====
+        self._gliding = False
+        if not self._grounded and self._vel.y > 0 and self._jumpHeld and self._coyoteTimer <= 0:
+            self._gliding = True
 
         # gravity
         if self._gliding:
@@ -610,7 +618,8 @@ class Character:
             if self._vel.y > self._maxGlideFallSpeed:
                 self._vel.y = self._maxGlideFallSpeed
         else:
-            self._vel.y += GAME_GRAVITY * dt
+            if not self._grounded:
+                self._vel.y += GAME_GRAVITY * dt
         
          # variable jump height
         if not self._jumpHolding and self._vel.y < 0:
@@ -838,7 +847,7 @@ class Character:
                         self._comboIndex = 0
                         self.frame_speed = 0.07
 
-                        if not self._grounded:
+                        if not self._grounded and self._coyoteTimer <= 0:
                             if self._gliding:
                                 self.set_animation("glide")
                             elif self._vel.y < 0:
@@ -873,21 +882,19 @@ class Character:
 
         self._grounded = False
 
-        self._rect.x = int(self._pos.x)
-        self._rect.y = int(self._pos.y)
+        # _pos is midtop for drawing/camera; collision map wants top-left position.
+        self._rect.midtop = (int(self._pos.x), int(self._pos.y))
+        collision_pos = pygame.Vector2(self._rect.topleft)
 
-        if self._pos.x <= MAP_LEFT:
-            self._pos.x = MAP_LEFT
+        self._grounded = self.map.update_position(collision_pos, self._rect, self._vel)
 
-        if self._pos.x + self._rect.width >= MAP_RIGHT:
-            self._pos.x = MAP_RIGHT - self._rect.width
+        # propagate collision-adjusted top-left position back to midtop position
+        self._pos.x = collision_pos.x + self._rect.width / 2
+        self._pos.y = collision_pos.y
+        self._rect.midtop = (int(self._pos.x), int(self._pos.y))
 
-        if self._pos.y + self._rect.height >= MAP_BOTTOM:
-
-            self._pos.y = MAP_BOTTOM - self._rect.height
+        if self._grounded:
             self._vel.y = 0
-
-            self._grounded = True
             self._jumpTimes = 0
 
     # -----------------------
@@ -923,13 +930,25 @@ class Character:
         # flip X offset when facing left
         if not self._facingRight:
             offset_x = -offset_x
-
+        
         draw_rect = image.get_rect(midtop=(
             draw_pos[0] + offset_x,
             draw_pos[1] + offset_y
         ))
 
-        screen.blit(image, draw_rect)
+        camera_x = min(max(draw_rect.x - SCREEN_WIDTH // 2, 0), MAP_NUMS[0]*TILE_SIZE - SCREEN_WIDTH)
+        camera_y = min(max(draw_rect.y - SCREEN_HEIGHT // 2, 0), MAP_NUMS[1]*TILE_SIZE - SCREEN_HEIGHT)
+        x,y = SCREEN_WIDTH//2 , SCREEN_HEIGHT//2
+        if camera_x == 0:
+            x = draw_rect.x
+        if camera_x == MAP_NUMS[0]*TILE_SIZE - SCREEN_WIDTH:
+            x = draw_rect.x%SCREEN_WIDTH
+        if camera_y == 0:
+            y = draw_rect.y
+        if camera_y == MAP_NUMS[1]*TILE_SIZE - SCREEN_HEIGHT:
+            y = draw_rect.y%SCREEN_HEIGHT
+
+        screen.blit(image, pygame.Rect(x,y, draw_rect.width, draw_rect.height))
 
         for effect in self.double_jump_effects:
 
@@ -1113,7 +1132,7 @@ class Character:
         self._comboIndex = 0
 
         # reset to a safe animation immediately
-        if not self._grounded:
+        if not self._grounded and self._coyoteTimer <= 0:
             if self._vel.y < 0:
                 self.set_animation("jump", True)
             else:
@@ -1325,3 +1344,6 @@ class Character:
                 self.frame_index = len(self.frames) - 1
 
         self._image = self.frames[self.frame_index]
+
+    def set_map(self, map: Map):
+        self.map = map
