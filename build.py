@@ -557,14 +557,14 @@ class Map:
             
         rect.topleft = (int(pos.x), int(pos.y))
         return is_ground
-    def build_collision(self, index_map):
+    def build_collision(self, index_map, collision_tiles):
+        self.collision_tiles = collision_tiles
         for i, row in enumerate(index_map):
             for j, cell in enumerate(row):
                 self.collision_map[i][j] = get_collison(cell)
+        
     
-    def load_collision_map(self, screen, index_map, collision_tiles, position):
-        self.build_collision(index_map)
-        self.collision_tiles = collision_tiles
+    def load_collision_map(self, screen, collision_tiles, position):
         load_map(screen, self.collision_map, collision_tiles, position)
     
     def build_push_map(self):

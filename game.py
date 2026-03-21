@@ -170,6 +170,7 @@ class Game:
         self.INDEX_MAP = load_map_from_excel()
         self.collision_map = Map()
         self.player.set_map(self.collision_map)
+        self.collision_map.build_collision(self.INDEX_MAP, self.collision_tiles)
 
     # -----------------------
     # INPUT
@@ -252,7 +253,7 @@ class Game:
         pos.y = self.player._pos.y
         
         load_map(self._screen, self.INDEX_MAP, self.map_tiles, pos)
-        self.collision_map.load_collision_map(self._screen, self.INDEX_MAP, self.collision_tiles, pos)
+        self.collision_map.load_collision_map(self._screen, self.collision_tiles, pos)
 
         # camera_x = min(max(pos.x - SCREEN_WIDTH // 2, 0), MAP_NUMS[0]*TILE_SIZE - SCREEN_WIDTH)
         # camera_y = min(max(pos.y - SCREEN_HEIGHT // 2, 0), MAP_NUMS[1]*TILE_SIZE - SCREEN_HEIGHT)
