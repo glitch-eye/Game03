@@ -5,12 +5,21 @@ import pygame
 import sys, json
 from pygame.locals import *
 
+import os
+import re
+import csv
+
+TILE_SIZE = 36
+MAP_NUMS = (120, 40)
+INDEX_MAP = [[0 for _ in range(MAP_NUMS[0])] for _ in range(MAP_NUMS[1])]
+
+
 #Game settings
 GAME_NAME = "Peak Platformer"
-SCREEN_WIDTH = 640
-SCREEN_HEIGHT = 360
+SCREEN_WIDTH = 900
+SCREEN_HEIGHT = 480
 FPS = 60
-GAME_SCALE = 2
+GAME_SCALE = 1
 
 FONT_SIZE = 36
 
@@ -20,12 +29,12 @@ COLOR_GREEN = (0, 255, 0)
 COLOR_BLACK = (0, 0, 0)
 
 #Game physics settings
-GAME_GRAVITY = 1200.0
+GAME_GRAVITY = 1000.0
 
 ##place holder for map collision
-MAP_BOTTOM = 360
+MAP_BOTTOM = 200
 MAP_LEFT = 0
-MAP_RIGHT = 640
+MAP_RIGHT = 120*36
 
 #player
 PLAYER_COLLISION_WIDTH = 32
@@ -39,7 +48,7 @@ PLAYER_JUMPSTRENGTH = 450.0
 PLAYER_JUMPHOLDTIME = 0.4                          # in secs
 PLAYER_DOUBLEJUMPHOLDTIME = 0.4                    # in secs
 PLAYER_DOUBLEJUMPSTRENGTH = 480.0
-PLAYER_INIT_POS = pygame.Vector2(132, 320)
+PLAYER_INIT_POS = pygame.Vector2(360, 33*36)
 PLAYER_HURTBOX_WIDTH = 18
 PLAYER_HURTBOX_HEIGHT = 48
 PLAYER_SLIDE_DURATION = 0.35
@@ -61,3 +70,5 @@ BOSS_ARENA = pygame.Rect(0, 0, 640, 360)
 
 #Items
 ITEM_COLLECT_RANGE = 30
+
+
