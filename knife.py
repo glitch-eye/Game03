@@ -125,7 +125,7 @@ class Knife:
         if self.timer >= self.life_time:
             self.alive = False
 
-    def draw(self, screen):
+    def draw(self, screen, camera_x, camera_y):
         # draw trails FIRST
         for trail in self.trails:
             frame = trail["frames"][trail["frame"]]
@@ -137,7 +137,7 @@ class Knife:
             angle = self.vel.angle_to(pygame.Vector2(1, 0))
             frame = pygame.transform.rotate(frame, angle)
 
-            rect = frame.get_rect(center=(trail["pos"].x, trail["pos"].y))
+            rect = frame.get_rect(center=(trail["pos"].x - camera_x, trail["pos"].y - camera_y))
             screen.blit(frame, rect)
 
         # draw knife
@@ -146,5 +146,5 @@ class Knife:
         # rotate sprite
         img = pygame.transform.rotate(self.image, angle)
 
-        rect = img.get_rect(center=(int(self.pos.x), int(self.pos.y)))
+        rect = img.get_rect(center=(int(self.pos.x - camera_x), int(self.pos.y - camera_y)))
         screen.blit(img, rect)

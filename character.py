@@ -360,6 +360,7 @@ class Character:
     # -----------------------
 
     def update(self, dt):
+        print(self._pos.y, self._pos.x)
         # 2nd jump effect 2
         for effect in self.double_jump_effects[:]:
             effect["timer"] += dt
@@ -825,10 +826,16 @@ class Character:
                 else:
                     # animation finished → stop sliding
                     self.player_sliding = False
-                    if self._inputDown:
-                        self.set_animation("crouch")
+                    if self._grounded:
+                        if self._inputDown:
+                            self.set_animation("crouch")
+                        else:
+                            self.set_animation("idle")
                     else:
-                        self.set_animation("idle")
+                        if self._keys["jump"]:
+                            self.set_animation("glide")
+                        else:    
+                            self.set_animation("falling")
 
             elif (
                 self.current_anim.startswith(("action", "run_attack"))
@@ -935,8 +942,6 @@ class Character:
             print(self._rect.height/2)
         self._grounded, _ = self.map.update_position(collision_pos, rect, self._vel)
         self.map.check_pressing(collision_pos, rect)
-        if self.player_sliding:
-            self._grounded = True
 
         # 4. Cập nhật lại _pos (midtop) từ kết quả top-left đã được điều chỉnh
         self._pos.x = collision_pos.x + self._rect.width / 2
@@ -1237,15 +1242,6 @@ class Character:
         self._knifeCooldown = self._knifeCooldownTime
         direction = 1 if self._facingRight else -1
 
-        map_width  = MAP_NUMS[0] * TILE_SIZE
-        map_height = MAP_NUMS[1] * TILE_SIZE
-
-        camera_x = self._pos.x - SCREEN_WIDTH // 2
-        camera_y = self._pos.y - SCREEN_HEIGHT // 2
-
-        camera_x = max(0, min(camera_x, map_width  - SCREEN_WIDTH))
-        camera_y = max(0, min(camera_y, map_height - SCREEN_HEIGHT))
-
         center_x = self._pos.x
         center_y = self._pos.y + self._rect.height // 2
         offset = 16
@@ -1265,7 +1261,7 @@ class Character:
         rand_x = random.randint(-offset_range, offset_range)
         rand_y = random.randint(-offset_range, offset_range)
 
-        base_pos = (center_x + dx + rand_x  - camera_x, center_y + dy + rand_y - camera_y)
+        base_pos = (center_x + dx + rand_x, center_y + dy + rand_y)
         knives = [
             Knife(base_pos, direction, self.loader,
                 attack_type=self.current_anim, y_offset=-15, forward_offset=5),
@@ -1283,18 +1279,9 @@ class Character:
         rand_x = random.randint(-offset_range, offset_range)
         rand_y = random.randint(-offset_range, offset_range)
 
-        map_width  = MAP_NUMS[0] * TILE_SIZE
-        map_height = MAP_NUMS[1] * TILE_SIZE
-
-        camera_x = self._pos.x - SCREEN_WIDTH // 2
-        camera_y = self._pos.y - SCREEN_HEIGHT // 2
-
-        camera_x = max(0, min(camera_x, map_width  - SCREEN_WIDTH))
-        camera_y = max(0, min(camera_y, map_height - SCREEN_HEIGHT))
-
         base_pos = (
-            self._rect.centerx + rand_x - camera_x,
-            self._rect.centery + rand_y - camera_y
+            self._rect.centerx + rand_x,
+            self._rect.centery + rand_y
         )
         knives = [
             Knife(base_pos, 1, self.loader, attack_type="down_shot",

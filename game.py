@@ -4,6 +4,7 @@ from utils import *
 from wisp import *
 from menu import *
 from boss import Boss
+from fire_gate import *
 from asset_loader import AssetLoader
 import pygame
 import sys
@@ -41,6 +42,12 @@ class Game:
         self.goblin = None
         self.boss = None
         self.executor = ThreadPoolExecutor(max_workers=4)
+        self.firegate = None
+
+        self.boss_spawned = False
+        self.boss_spawn_triggered = False
+        self.boss_spawn_timer = 0
+        self.boss_spawn_delay = 1.2 
 
     # -----------------------
     # ASSET LOADING
@@ -95,6 +102,7 @@ class Game:
         self.loader.load_animation("mp_item", "assets/sprite/mpup_sprite")
         self.loader.load_animation("hp_item", "assets/sprite/hpup_sprite")
         self.loader.load_animation("huda_fire", "assets/sprite/huda_fire")
+        self.loader.load_image("magatama", "assets/sprite/item_magatama/item_magatama_0.png")
 
         # UI
         self.loader.load_image("gauge", "assets/sprite/gauge_sprite/gauge_sprite_1.png")
@@ -125,6 +133,12 @@ class Game:
         self.loader.load_animation("marisa_after_effect_s", "assets/sprite/marisa_after_effect_s")
         self.loader.load_animation("marisa_shot_a", "assets/sprite/marisa_shot_a")
         self.loader.load_animation("smoke", "assets/sprite/smoke")
+        self.loader.load_animation("marisa_zangai", "assets/sprite/marisa_shot_effect_zangai")
+        self.loader.load_animation("marisa_supershot", "assets/sprite/marisa_supershot")
+        self.loader.load_animation("marisa_supershot_a", "assets/sprite/marisa_supershot_a")
+        self.loader.load_animation("marisa_supershot_b", "assets/sprite/marisa_supershot_b")
+        self.loader.load_animation("marisa_supershot_c", "assets/sprite/marisa_supershot_c")
+        self.loader.load_animation("marisa_supershot_d", "assets/sprite/marisa_supershot_d")
         # sounds
 
         # enemies
@@ -176,6 +190,10 @@ class Game:
         # spawn boss
         self.boss = Boss(self.loader, self, self.player)
 
+        # spawn fire gate
+        self.fire_gate = FireGate((3347.0, 470.0), self.loader)
+        self.magatamas = [Magatama((2850, 680), self.loader)]
+
         self.BG = build_background()
         self.INDEX_MAP = load_map_from_excel()
         self.collision_map = Map()
@@ -226,21 +244,49 @@ class Game:
         self.collision_map.update_position(pos, pygame.Rect(0,0,40,40), pygame.Vector2(10,10))
         self.player.update(dt)
 
+        # -----------------------
+        # BOSS SPAWN TRIGGER
+        # -----------------------
+        if not self.boss_spawned:
+
+            # Player enters trigger → start countdown
+            if not self.boss_spawn_triggered:
+                if self.player._pos.x >= 3412 and self.player._pos.y >= 404:
+                    self.boss_spawn_triggered = True
+                    self.boss_spawn_timer = self.boss_spawn_delay
+
+            # Countdown running
+            else:
+                self.boss_spawn_timer -= dt
+                if self.boss_spawn_timer <= 0:
+                    self.boss.visible = True
+                    self.boss_spawned = True
+
+        # fire gate
+        self.fire_gate.update(dt, self.player)
+
         if not self.time_stop:
-            self.boss.update(dt, self.player._pos, self.knives)
+            if self.boss_spawned:
+                self.boss.update(dt, self.player._pos, self.knives)
             list(self.executor.map(lambda x: x.update(dt, self.player, self.knives), self.wisp))
             list(self.executor.map(lambda x: x.update(dt, self.player, self.knives), self.goblin))
             self.crystal.update(dt, self.player._pos, self.knives)
 
+            # magatamas
+            for m in self.magatamas:
+                m.update(dt, self.player)
+
+            self.magatamas = [m for m in self.magatamas if m.alive]
+
             for knife in self.knives:
                 knife.update(dt)
-
-            for proj in self.enemy_projectiles:
-                proj.update(dt, self.player._rect, self.enemy_particles)
 
             # --- Update enemy particles ---
             for p in self.enemy_particles:
                 p.update(dt)
+
+            for proj in self.enemy_projectiles:
+                proj.update(dt, self.player._rect, self.enemy_particles)
 
             self.enemy_particles = [p for p in self.enemy_particles if p.alive]
 
@@ -296,18 +342,32 @@ class Game:
             # -----------------------
             # DRAW WORLD (no player)
             # -----------------------
+            map_width  = MAP_NUMS[0] * TILE_SIZE
+            map_height = MAP_NUMS[1] * TILE_SIZE
+
+            self.camera_x = self.player._pos.x - SCREEN_WIDTH // 2
+            self.camera_y = self.player._pos.y - SCREEN_HEIGHT // 2
+
+            self.camera_x = max(0, min(self.camera_x, map_width  - SCREEN_WIDTH))
+            self.camera_y = max(0, min(self.camera_y, map_height - SCREEN_HEIGHT))
+
             list(self.executor.map(lambda x: x.draw(self._screen, pos), self.wisp))
             list(self.executor.map(lambda x: x.draw(self._screen, pos), self.goblin))
             self.crystal.draw(self._screen, pos)
+            # draw fire gate
+            self.fire_gate.draw(self._screen, self.camera_x, self.camera_y)
+            for m in self.magatamas:
+                m.draw(self._screen, self.camera_x, self.camera_y)
+
             # draw boss
-            self.boss.draw(self._screen)
+            self.boss.draw(self._screen, self.camera_x, self.camera_y)
 
             for knife in self.knives:
-                knife.draw(self._screen)
-            for proj in self.enemy_projectiles:
-                proj.draw(self._screen)
+                knife.draw(self._screen, self.camera_x, self.camera_y)
             for p in self.enemy_particles:
-                p.draw(self._screen)
+                p.draw(self._screen, self.camera_x, self.camera_y)
+            for proj in self.enemy_projectiles:
+                proj.draw(self._screen, self.camera_x, self.camera_y)
 
             # -----------------------
             # APPLY FILTER SAFELY

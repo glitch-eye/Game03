@@ -30,11 +30,43 @@ class DashTrail:
 
         self.rect.center = self.pos
 
-    def draw(self, screen):
+    def draw(self, screen, camera_x, camera_y):
         img = self.image
         if not self.facing_right:
             img = pygame.transform.flip(img, True, False)
-        screen.blit(img, self.rect)
+        screen.blit(img, self.rect.move(int(-camera_x), int(-camera_y)))
+
+class ZangaiTrail:
+    def __init__(self, pos, frames):
+        self.frames = frames
+        self.frame_index = 0
+        self.frame_timer = 0
+        self.frame_speed = 0.04
+
+        self.image = frames[0]
+        self.pos = pygame.Vector2(pos)
+        self.rect = self.image.get_rect(center=self.pos)
+
+        self.life = 0.22  # short lived
+        self.alive = True
+
+    def update(self, dt):
+        self.life -= dt
+        if self.life <= 0:
+            self.alive = False
+            return
+
+        self.frame_timer += dt
+        if self.frame_timer >= self.frame_speed:
+            self.frame_timer = 0
+            self.frame_index = (self.frame_index + 1) % len(self.frames)
+            self.image = self.frames[self.frame_index]
+
+    def draw(self, screen, camera_x, camera_y):
+        img = self.image.copy()
+        img.set_alpha(int(255 * (self.life / 0.22)))
+        rect = img.get_rect(center=self.pos)
+        screen.blit(img, rect.move(-camera_x, -camera_y))
 
 class SmokeColumn:
     def __init__(self, pos, frames):
@@ -73,7 +105,7 @@ class SmokeColumn:
             self.frame_timer = 0
             self.frame_index = (self.frame_index + 1) % len(self.frames)
     
-    def draw(self, screen):
+    def draw(self, screen, camera_x, camera_y):
         frame = self.frames[self.frame_index]
         w = frame.get_width()
         h = frame.get_height()
@@ -91,7 +123,7 @@ class SmokeColumn:
             x = base_x - w // 2
             y = base_y - h - i * overlap
 
-            screen.blit(frame, (x, y))
+            screen.blit(frame, (x - camera_x, y - camera_y))
 
 class TimeShotProjectile:
     def __init__(self, pos, facing_right, loader):
@@ -121,7 +153,8 @@ class TimeShotProjectile:
         self.pos.y += self.fall_speed * dt
 
         # Remove when offscreen
-        if self.pos.y > SCREEN_HEIGHT:
+        ground_y = BOSS_ARENA.bottom
+        if self.pos.y >= ground_y + 50:
             self.alive = False
 
             explosion_pos = pygame.Vector2(self.rect.midbottom)
@@ -140,15 +173,15 @@ class TimeShotProjectile:
 
         self.rect.center = self.pos
 
-    def draw(self, screen):
+    def draw(self, screen, camera_x, camera_y):
         img = self.image
         if not self.facing_right:
             img = pygame.transform.flip(img, True, False)
-        screen.blit(img, self.rect)
+        screen.blit(img, self.rect.move(int(-camera_x), int(-camera_y)))
 
 
 class UndershotProjectile:
-    def __init__(self, x, y, proj_frames, laser_frames):
+    def __init__(self, x, y, proj_frames, laser_frames, zangai_frames):
         self.proj_frames = proj_frames
         self.laser_frames = laser_frames
         self.frames = proj_frames
@@ -165,8 +198,13 @@ class UndershotProjectile:
         self.state = "projectile"
         self.alive = True
 
+        self.zangai_frames = zangai_frames
+        self.zangai_timer = 0
+        self.zangai_duration = 0.18
+        self.zangai_interval = 0.02
+
         # TRUE physics ground
-        self.ground_y = SCREEN_HEIGHT
+        self.ground_y = BOSS_ARENA.bottom + 70
 
     def update(self, dt, player_rect=None, particle_list=None):
 
@@ -179,7 +217,23 @@ class UndershotProjectile:
             # Wait until it ACTUALLY touches ground
             if self.rect.bottom >= self.ground_y:
                 self.rect.bottom = self.ground_y
+                particle_list.append(
+                        ZangaiTrail(
+                            (self.rect.centerx, self.ground_y),
+                            self.zangai_frames
+                        )
+                    )
                 self._become_laser()
+
+        self.zangai_timer += dt
+
+        if self.zangai_timer <= self.zangai_duration:
+            self.zangai_interval -= dt
+            if self.zangai_interval <= 0:
+                self.zangai_interval = 0.02
+                particle_list.append(
+                    ZangaiTrail(self.rect.center, self.zangai_frames)
+                )
 
         # -----------------------
         # ANIMATION
@@ -217,14 +271,14 @@ class UndershotProjectile:
 
         # Anchor to bottom center of screen
         self.rect = self.image.get_rect(
-            midbottom=(self.rect.centerx, SCREEN_HEIGHT)
+            midbottom=(self.rect.centerx, BOSS_ARENA.bottom + 70)
         )
 
-    def draw(self, screen):
-        screen.blit(self.image, self.rect)
+    def draw(self, screen, camera_x, camera_y):
+        screen.blit(self.image, self.rect.move(int(-camera_x), int(-camera_y)))
 
 class ShotProjectile:
-    def __init__(self, start, first_target, frames, facing_right, trail_big, trail_small):
+    def __init__(self, start, first_target, frames, facing_right, trail_big, trail_small, zangai_frames):
         self.frames = frames
         self.frame_index = 0
         self.frame_timer = 0
@@ -242,6 +296,11 @@ class ShotProjectile:
         self.trail_small = trail_small
         self.trail_timer = 0
 
+        self.zangai_frames = zangai_frames
+        self.zangai_timer = 0
+        self.zangai_duration = 0.18
+        self.zangai_interval = 0.02
+
         # --- Homing phases ---
         self.phase = 1
         self.phase_timer = 0
@@ -252,7 +311,7 @@ class ShotProjectile:
         self.speed_phase2 = 500
 
         self.fly_time = 0
-        self.max_fly_time = 0.35
+        self.max_fly_time = 10.0
 
         direction = (self.target - self.pos)
         if direction.length() != 0:
@@ -276,6 +335,16 @@ class ShotProjectile:
                 self.velocity = pygame.Vector2(0, 0)
                 self.target = pygame.Vector2(player_rect.center)
 
+        self.zangai_timer += dt
+
+        if self.zangai_timer <= self.zangai_duration:
+            self.zangai_interval -= dt
+            if self.zangai_interval <= 0:
+                self.zangai_interval = 0.02
+                particle_list.append(
+                    ZangaiTrail(self.pos, self.zangai_frames)
+                )
+
         # -----------------------
         # PHASE 2 — Aggressive dash
         # -----------------------
@@ -288,9 +357,12 @@ class ShotProjectile:
                 self.velocity = direction * self.speed_phase2
                 self.pos += self.velocity * dt
             else:
-                # Instead of dying, enter fly-through phase
                 self.phase = 3
                 self.fly_time = 0
+
+                # keep strong forward motion
+                if self.velocity.length() != 0:
+                    self.velocity = self.velocity.normalize() * self.speed_phase2
 
         # -----------------------
         # PHASE 3 — Fly-through
@@ -300,13 +372,20 @@ class ShotProjectile:
             self.pos += self.velocity * dt
 
             # Hit ground
-            if self.pos.y >= SCREEN_HEIGHT - 10:
+            ground_y = BOSS_ARENA.bottom
+            if self.pos.y >= ground_y + 50:
                 self.alive = False
+                particle_list.append(
+                    ZangaiTrail(self.pos, self.zangai_frames)
+                )
                 return
 
             # Timeout
             if self.fly_time >= self.max_fly_time:
                 self.alive = False
+                particle_list.append(
+                    ZangaiTrail(self.pos, self.zangai_frames)
+                )
                 return
 
         # -----------------------
@@ -357,5 +436,5 @@ class ShotProjectile:
             self.frame_index = (self.frame_index + 1) % len(self.frames)
             self.image = self.frames[self.frame_index]
 
-    def draw(self, screen):
-        screen.blit(self.image, self.rect)
+    def draw(self, screen, camera_x, camera_y):
+        screen.blit(self.image, self.rect.move(int(-camera_x), int(-camera_y)))
