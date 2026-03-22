@@ -90,21 +90,24 @@ def get_collison(idx):
     elif idx in half_left:
         return 26
     return 0
-def resolve_yin_yang(text):
+def resolve_huda(text, is_black):
     if text == "gh":
         return 5
-    if text == "bh":
+    if text == "bh" and is_black:
         return 6
-    if text == "bv":
+    if text == "bv" and is_black:
         return 7
-    if text == "gb" or text == "bb":
+    if text == "gb":
         return 4
-    if text == "wh":
+    if text == "wh" and not is_black:
         return 2
-    if text == "wv":
+    if text == "bb":
+        return 4
+    if text == "wv" and not is_black:
         return 3
     if text == "wb":
         return 0
+    return None
 
 class Map_animation_handler:
     def __init__(self):
@@ -113,9 +116,41 @@ class Map_animation_handler:
         self.nonstop = []
         self.ora = []
         self.white_ring = []
-        self.mode = 0
-    def display(self, tile_idx, screen, screen_x, screen_y, is_black):
-        pass
+
+    def display(self, tile_idx, screen, screen_x, screen_y, is_black, incoming, mode = 0):
+        num = resolve_huda(tile_idx, is_black)
+        if num is not None:
+            image = self.huda[num]
+            image = pygame.transform.scale(image, (TILE_SIZE,TILE_SIZE))
+            screen.blit(image, (screen_x, screen_y))
+            if is_black and tile_idx == "bb":
+                image2 = self.huda[9]
+                image2.set_alpha(int(255* mode /8))
+                image2 = pygame.transform.scale(image2, (TILE_SIZE,TILE_SIZE))
+                screen.blit(image2, (screen_x, screen_y))
+            elif not is_black and tile_idx == "wb":
+                image2 = self.huda[8]
+                image2.set_alpha(int(255* mode /8))
+                image2 = pygame.transform.scale(image2, (TILE_SIZE,TILE_SIZE))
+                screen.blit(image2, (screen_x, screen_y))
+            return
+        if tile_idx == "r":
+            image = self.stop[1] if is_black else self.stop[0]
+            image = pygame.transform.scale(image, (TILE_SIZE,TILE_SIZE))
+            screen.blit(image, (screen_x, screen_y))
+            return
+        if tile_idx == "vr":
+            image0 = self.nonstop[2]
+            image0 = pygame.transform.scale(image0, (TILE_SIZE,TILE_SIZE))
+            screen.blit(image0, (screen_x, screen_y))
+            is_black_real = is_black if not incoming else not is_black 
+            image = self.nonstop[1] if is_black_real else self.stop[0]
+            image = pygame.transform.scale(image, (TILE_SIZE,TILE_SIZE))
+            screen.blit(image, (screen_x, screen_y))
+            return
+        
+
+
 
 class Collide_direct:
     def __init__(self):
@@ -128,12 +163,18 @@ class Collide_direct:
 
 class Map:
     def __init__(self):
+        self.stop = None
+        self.nonstop = None
         self.black = True
         self.pause = False
+        self.mode = 0
+        self.tolerant = 5
+        self.time = 0
         self.incoming_signal = False
         self.collision_map = [[ 0 for _ in range (MAP_NUMS[0])] for _ in range (MAP_NUMS[1])]
         self.collision_tiles = []
-        self.prev_foot_y = 0
+        self.prev_foot_y = None
+        self.pre_pos = None
         self.puzzle = Map_animation_handler()
         self.condition_collision = {}
     def check_collision(self, position, rect : pygame.Rect):
@@ -302,10 +343,7 @@ class Map:
                     vel.x = 0
                     modify = True
             if modify:
-                print(position.x)
-                print("ok")
                 position.x = max(target_x, position.x)
-                print(position.x)
                 rect.topleft = (int(position.x), int(position.y))
                 self.prev_foot_y = foot_y
         return is_ground, count
@@ -395,10 +433,8 @@ class Map:
         row = int(foot_y // TILE_SIZE)
         
         is_ground = False
-        tolerance = 5  # Khoảng dung sai để bám vào dốc (pixels)
-        current_block = None
-        if count == 3:
-            return is_ground
+        if self.prev_foot_y is None:
+            self.prev_foot_y =  foot_y
         # Continuous collision detection - kiểm tra tất cả rows giữa vị trí cũ và mới
         prev_row = int(self.prev_foot_y // TILE_SIZE)
         if vel.y > 0 and row > prev_row:  # Đang rơi xuống
@@ -537,6 +573,8 @@ class Map:
                         self.condition_collision[cell]=[[i,j]]
                     else:
                         dic += [[i,j]]
+        self.load_keys()
+        self.set_collision_by_condition()
 
     def load_map(self, screen, index_map, map_tiles, position):
         """
@@ -545,7 +583,13 @@ class Map:
         """
         if index_map is None or not map_tiles:
             return
-        self.set_collision_by_condition()
+        self.time = self.time + 1
+        if self.time == self.tolerant:
+            self.mode +=  1
+            self.time = 0
+            if self.mode >= 8 :
+                self.mode = 0
+
         # Tính vị trí camera trong thế giới (world coordinates)
         camera_x = min(max(position.x - SCREEN_WIDTH // 2, 0), MAP_NUMS[0]*TILE_SIZE - SCREEN_WIDTH)
         camera_y = min(max(position.y - SCREEN_HEIGHT // 2, 0), MAP_NUMS[1]*TILE_SIZE - SCREEN_HEIGHT)
@@ -571,7 +615,7 @@ class Map:
                         if idx != 0:
                             screen.blit(map_tiles[idx], (screen_x, screen_y))
                 elif isinstance(tile_idx, str):
-                    self.puzzle.display(tile_idx, screen, screen_x, screen_y, self.black)
+                    self.puzzle.display(tile_idx, screen, screen_x, screen_y, self.black, self.incoming_signal, self.mode)
                 else:
                     if tile_idx < 0 or tile_idx >= len(map_tiles):
                         continue
@@ -644,11 +688,13 @@ class Map:
             
             # 2. Kiểm tra điều kiện theo trạng thái Âm - Dương (Black/White)
             elif self.black:
+                print("black")
                 if key_str.startswith('b'):
                     collision_value = 1
                 elif key_str.startswith('w'):
                     collision_value = 0
             else: # self.black == False
+                print("white")
                 if key_str.startswith('b'):
                     collision_value = 0
                 elif key_str.startswith('w'):
@@ -666,6 +712,42 @@ class Map:
         if self.incoming_signal == True:
             self.black = not self.black
             self.incoming_signal = False
+            self.set_collision_by_condition()
+    def load_keys(self):
+        self.stop = self.condition_collision["r"]
+        self.nonstop = self.condition_collision["vr"]
+
+
+    def rect_collide(self, pos, rect, pos_, rect_):
+        return pos.x <= pos_.x + rect_.width and pos_.x <= pos.x + rect.width and pos.y <= pos_.y + rect_.height and pos_.y <= pos.y + rect.height
+
+    def check_pressing(self, position, rect):
+        if self.pre_pos is not None and self.pre_pos.x == position.x and self.pre_pos.y == position.y:
+            return
+        pre_pos = pygame.Vector2(self.pre_pos.x, self.pre_pos.y) if self.pre_pos is not None else None
+        if self.pre_pos is None:
+            self.pre_pos = pygame.Vector2(position.x, position.y)
+        for pos in self.nonstop:
+            if self.rect_collide(position, rect, pygame.Vector2(pos[1]* TILE_SIZE, pos[0]* TILE_SIZE), pygame.Rect(0, 0, TILE_SIZE, TILE_SIZE)):
+                if pre_pos is not None and not self.rect_collide(pre_pos, rect, pygame.Vector2(pos[1]* TILE_SIZE, pos[0]* TILE_SIZE), pygame.Rect(0, 0, TILE_SIZE, TILE_SIZE)):
+                    if self.pause:
+                        self.incoming_signal = not self.incoming_signal
+                    else:
+                        self.black = not self.black
+                        print("ok")
+                        self.set_collision_by_condition()
+                    break
+        if not self.pause: 
+            for pos in self.stop:
+                if self.rect_collide(position, rect, pygame.Vector2(pos[1] * TILE_SIZE, pos[0] * TILE_SIZE), pygame.Rect(0, 0, TILE_SIZE, TILE_SIZE)):
+                    if pre_pos is not None and not self.rect_collide(pre_pos, rect, pygame.Vector2(pos[1]* TILE_SIZE, pos[0]* TILE_SIZE), pygame.Rect(0, 0, TILE_SIZE, TILE_SIZE)):   
+                        self.black = not self.black
+                        print("ok")
+                        self.set_collision_by_condition()
+                        break
+        self.pre_pos = pygame.Vector2(position.x, position.y)
+        return
+            
     
 
 
