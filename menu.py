@@ -4,7 +4,7 @@ from settings import *
 from pygame.locals import *
 
 class Menu:
-    def __init__(self, loader, font=None, pos=(100, 100), spacing=50):
+    def __init__(self, loader, font=None, pos=(100, 100), spacing=40):
         self.options = ["New Game", "Load Game", "Settings", "About", "Exit"]
         self.scales = [1, 1.5, 2]
         self.scale_index = 0
@@ -231,13 +231,14 @@ class Menu:
         elif self.game_start and self.game_paused:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 _, mouse_y = event.pos
-                if mouse_y in range(PAUSE_RESUME[0], PAUSE_RESUME[1]):
+                if mouse_y in range(PAUSE_RESUME[0] * self.setting_options["GAME SCALE"], PAUSE_RESUME[1] * self.setting_options["GAME SCALE"]):
                     self.game_paused = False
                     return True
-                elif mouse_y in range(PAUSE_EXIT[0], PAUSE_EXIT[1]):
+                elif mouse_y in range(PAUSE_EXIT[0] * self.setting_options["GAME SCALE"], PAUSE_EXIT[1] * self.setting_options["GAME SCALE"]):
                     self.game_start = False
                     self.game_paused = False
-        return None
+                    return False
+        return False
 
     def update_setting(self, up):
         if self.setting_index == 0:
