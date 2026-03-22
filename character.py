@@ -883,16 +883,24 @@ class Character:
 
         # 1. Đồng bộ rect từ vị trí midtop hiện tại
         self._rect.midtop = (int(self._pos.x), int(self._pos.y))
-
+        
         # 2. Lấy vị trí top-left để đưa vào hệ thống va chạm
         collision_pos = pygame.Vector2(self._rect.topleft)
-
         # 3. Gọi hàm va chạm → hàm này sẽ sửa collision_pos và self._vel
-        self._grounded, _ = self.map.update_position(collision_pos, self._rect, self._vel)
+        rect = self._rect
+        if self.player_sliding:
+            collision_pos = pygame.Vector2(collision_pos.x, collision_pos.y + self._rect.height/2)
+            rect = pygame.Rect(collision_pos.x, collision_pos.y, rect.width, self._rect.height/2)
+            print(collision_pos.y)
+            print(self._rect.height/2)
+        self._grounded, _ = self.map.update_position(collision_pos, rect, self._vel)
+        self.map.check_pressing(collision_pos, rect)
+        if self.player_sliding:
+            self._grounded = True
 
         # 4. Cập nhật lại _pos (midtop) từ kết quả top-left đã được điều chỉnh
         self._pos.x = collision_pos.x + self._rect.width / 2
-        self._pos.y = collision_pos.y               # ← điểm midtop.y = top.y (vì midtop)
+        self._pos.y = collision_pos.y if not self.player_sliding else collision_pos.y - self._rect.height / 2         # ← điểm midtop.y = top.y (vì midtop)
 
         # 5. Đồng bộ lại rect từ midtop (để vẽ / camera dùng)
         self._rect.midtop = (int(self._pos.x), int(self._pos.y))

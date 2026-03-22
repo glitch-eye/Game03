@@ -158,19 +158,12 @@ class Game:
                 sys.exit()
 
         keypressed = pygame.key.get_pressed()
+        if self.time_stop:
+            self.collision_map.time_stop()
+        else:
+            self.collision_map.time_go()
+        
 
-        if keypressed[pygame.K_RIGHT]:
-            pos.x += 10
-            pos.x = min(pos.x, MAP_NUMS[0]*TILE_SIZE)
-        if keypressed[pygame.K_LEFT]:
-            pos.x -= 10
-            pos.x = max(pos.x, 0)
-        if keypressed[pygame.K_UP]:
-            pos.y -= 10
-            pos.y = max(pos.y, 0)
-        if keypressed[pygame.K_DOWN]:
-            pos.y += 10
-            pos.y = min(pos.y, MAP_NUMS[1]*TILE_SIZE)
         self.player.handleInput(keypressed)
         
 
@@ -179,7 +172,6 @@ class Game:
     # -----------------------
 
     def update(self, dt):
-        self.collision_map.update_position(pos, pygame.Rect(0,0,40,40), pygame.Vector2(10,10))
         self.player.update(dt)
 
         if not self.time_stop:
