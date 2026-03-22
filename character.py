@@ -819,6 +819,17 @@ class Character:
                     self._turning = False
                     self.set_animation("run")
 
+            elif self.current_anim == "slide":
+                if self.frame_index < len(self.frames) - 1:
+                    self.frame_index += 1
+                else:
+                    # animation finished → stop sliding
+                    self.player_sliding = False
+                    if self._inputDown:
+                        self.set_animation("crouch")
+                    else:
+                        self.set_animation("idle")
+
             elif (
                 self.current_anim.startswith(("action", "run_attack"))
                 or self.current_anim in ("jump_attack","under_attack","up_shot","up_shot2","up_shot_air","up_shot_run")
