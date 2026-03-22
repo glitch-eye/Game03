@@ -262,53 +262,13 @@ class Game:
     def draw(self):
         self._screen.fill(COLOR_BLACK)
         self._screen.blit(self.BG, (0,0))
+        
         if self.in_menu:
             self.menu.draw(self._screen)
             scaled = pygame.transform.scale(
                 self._screen,
                 (SCREEN_WIDTH * GAME_SCALE, SCREEN_HEIGHT * GAME_SCALE)
             )
-        # Update camera position to follow player
-        pos.x = self.player._pos.x
-        pos.y = self.player._pos.y
-        
-        self.collision_map.load_map(self._screen, self.INDEX_MAP, self.map_tiles, pos)
-        self.collision_map.load_collision_map(self._screen, self.collision_tiles, pos)
-
-        # camera_x = min(max(pos.x - SCREEN_WIDTH // 2, 0), MAP_NUMS[0]*TILE_SIZE - SCREEN_WIDTH)
-        # camera_y = min(max(pos.y - SCREEN_HEIGHT // 2, 0), MAP_NUMS[1]*TILE_SIZE - SCREEN_HEIGHT)
-        # x,y = SCREEN_WIDTH//2 , SCREEN_HEIGHT//2
-        # if camera_x == 0:
-        #     x = pos.x
-        # if camera_x == MAP_NUMS[0]*TILE_SIZE - SCREEN_WIDTH:
-        #     x = pos.x%SCREEN_WIDTH
-        # if camera_y == 0:
-        #     y = pos.y
-        # if camera_y == MAP_NUMS[1]*TILE_SIZE - SCREEN_HEIGHT:
-        #     y = pos.y%SCREEN_HEIGHT
-        
-        # pygame.draw.rect(self._screen, (255, 0, 0), (x, y, 40, 40))
-        # -----------------------
-        # DRAW WORLD (no player)
-        # -----------------------
-        self.wisp.draw(self._screen)
-        self.goblin.draw(self._screen)
-        self.crystal.draw(self._screen)
-        # draw boss
-        self.boss.draw(self._screen)
-
-        for knife in self.knives:
-            knife.draw(self._screen)
-        for proj in self.enemy_projectiles:
-            proj.draw(self._screen)
-        for p in self.enemy_particles:
-            p.draw(self._screen)
-
-        # -----------------------
-        # APPLY FILTER SAFELY
-        # -----------------------
-        if self.time_stop:
-            filtered = apply_grayscale(self._screen.copy())
         else:
             # Update camera position to follow player
             pos.x = self.player._pos.x
@@ -336,9 +296,15 @@ class Game:
             self.wisp.draw(self._screen)
             self.goblin.draw(self._screen, pos)
             self.crystal.draw(self._screen)
+            # draw boss
+            self.boss.draw(self._screen)
 
             for knife in self.knives:
                 knife.draw(self._screen)
+            for proj in self.enemy_projectiles:
+                proj.draw(self._screen)
+            for p in self.enemy_particles:
+                p.draw(self._screen)
 
             # -----------------------
             # APPLY FILTER SAFELY
@@ -346,149 +312,174 @@ class Game:
             if self.time_stop:
                 filtered = apply_grayscale(self._screen.copy())
             else:
-                filtered = self._screen
+                # Update camera position to follow player
+                pos.x = self.player._pos.x
+                pos.y = self.player._pos.y
+                
+                self.collision_map.load_map(self._screen, self.INDEX_MAP, self.map_tiles, pos)
+                self.collision_map.load_collision_map(self._screen, self.collision_tiles, pos)
 
-            # -----------------------
-            # HP/MP bar
-            # -----------------------
-            hp_bar = self.loader.get_image("hp_bar")
-            mp_bar = self.loader.get_image("mp_bar")
+                # camera_x = min(max(pos.x - SCREEN_WIDTH // 2, 0), MAP_NUMS[0]*TILE_SIZE - SCREEN_WIDTH)
+                # camera_y = min(max(pos.y - SCREEN_HEIGHT // 2, 0), MAP_NUMS[1]*TILE_SIZE - SCREEN_HEIGHT)
+                # x,y = SCREEN_WIDTH//2 , SCREEN_HEIGHT//2
+                # if camera_x == 0:
+                #     x = pos.x
+                # if camera_x == MAP_NUMS[0]*TILE_SIZE - SCREEN_WIDTH:
+                #     x = pos.x%SCREEN_WIDTH
+                # if camera_y == 0:
+                #     y = pos.y
+                # if camera_y == MAP_NUMS[1]*TILE_SIZE - SCREEN_HEIGHT:
+                #     y = pos.y%SCREEN_HEIGHT
+                
+                # pygame.draw.rect(self._screen, (255, 0, 0), (x, y, 40, 40))
+                # -----------------------
+                # DRAW WORLD (no player)
+                # -----------------------
+                self.wisp.draw(self._screen)
+                self.goblin.draw(self._screen, pos)
+                self.crystal.draw(self._screen)
 
-            # ratios
-            hp_ratio = self.player.hp / self.player.hp_max
-            mp_ratio = self.player.mp / self.player.mp_max
+                for knife in self.knives:
+                    knife.draw(self._screen)
 
-            # clamp
-            hp_ratio = max(0, min(1, hp_ratio))
-            mp_ratio = max(0, min(1, mp_ratio))
+                # -----------------------
+                # APPLY FILTER SAFELY
+                # -----------------------
+                if self.time_stop:
+                    filtered = apply_grayscale(self._screen.copy())
+                else:
+                    filtered = self._screen
 
-            # --- crop width ---
-            hp_width = int(hp_bar.get_width() * hp_ratio)
-            mp_width = int(mp_bar.get_width() * mp_ratio)
+                # -----------------------
+                # HP/MP bar
+                # -----------------------
+                hp_bar = self.loader.get_image("hp_bar")
+                mp_bar = self.loader.get_image("mp_bar")
 
-            # create cropped surfaces
-            hp_crop = pygame.Surface((hp_width, hp_bar.get_height()), pygame.SRCALPHA)
-            mp_crop = pygame.Surface((mp_width, mp_bar.get_height()), pygame.SRCALPHA)
-        # --- position (under your gauge UI) ---
-        base_x = SCREEN_WIDTH // 2 - 199   # tweak this
-        base_y = 25                        # tweak this
+                # ratios
+                hp_ratio = self.player.hp / self.player.hp_max
+                mp_ratio = self.player.mp / self.player.mp_max
 
-            hp_crop.blit(hp_bar, (0, 0), (0, 0, hp_width, hp_bar.get_height()))
-            mp_crop.blit(mp_bar, (0, 0), (0, 0, mp_width, mp_bar.get_height()))
+                # clamp
+                hp_ratio = max(0, min(1, hp_ratio))
+                mp_ratio = max(0, min(1, mp_ratio))
 
-            # --- position (under your gauge UI) ---
-            base_x = SCREEN_WIDTH // 2 - 195   # tweak this
-            base_y = 33                        # tweak this
+                # --- crop width ---
+                hp_width = int(hp_bar.get_width() * hp_ratio)
+                mp_width = int(mp_bar.get_width() * mp_ratio)
 
-         # draw HP (top)
-            filtered.blit(hp_crop, (base_x, base_y))
-        value = int(self.player.time_energy)
-        digits = list(str(value))
+                # create cropped surfaces
+                hp_crop = pygame.Surface((hp_width, hp_bar.get_height()), pygame.SRCALPHA)
+                mp_crop = pygame.Surface((mp_width, mp_bar.get_height()), pygame.SRCALPHA)
+                # --- position (under your gauge UI) ---
+                base_x = SCREEN_WIDTH // 2 - 199   # tweak this
+                base_y = 25                        # tweak this
 
-        # -----------------------
-        # BOSS HP BAR
-        # -----------------------
-        if self.boss and self.boss.hp > 0:
+                hp_crop.blit(hp_bar, (0, 0), (0, 0, hp_width, hp_bar.get_height()))
+                mp_crop.blit(mp_bar, (0, 0), (0, 0, mp_width, mp_bar.get_height()))                      # tweak this
 
-            base_bar = self.loader.get_image("hp_bar")
-            boss_bar = recolor_red(base_bar)
+            # draw HP (top)
+                filtered.blit(hp_crop, (base_x, base_y))
+                value = int(self.player.time_energy)
+                digits = list(str(value))
 
-            # --- Stretch horizontally ---
-            stretch_w = int(boss_bar.get_width() * 1.7)   # widen boss bar
-            stretch_h = boss_bar.get_height()
+                # -----------------------
+                # BOSS HP BAR
+                # -----------------------
+                if self.boss and self.boss.hp > 0:
 
-            boss_bar = pygame.transform.scale(boss_bar, (stretch_w, stretch_h))
+                    base_bar = self.loader.get_image("hp_bar")
+                    boss_bar = recolor_red(base_bar)
 
-            ratio = self.boss.hp / self.boss.max_hp
-            ratio = max(0, min(1, ratio))
+                    # --- Stretch horizontally ---
+                    stretch_w = int(boss_bar.get_width() * 1.7)   # widen boss bar
+                    stretch_h = boss_bar.get_height()
 
-            width = int(stretch_w * ratio)
+                    boss_bar = pygame.transform.scale(boss_bar, (stretch_w, stretch_h))
 
-            crop = pygame.Surface((width, stretch_h), pygame.SRCALPHA)
-            crop.blit(boss_bar, (0,0), (0,0,width,stretch_h))
+                    ratio = self.boss.hp / self.boss.max_hp
+                    ratio = max(0, min(1, ratio))
 
-            # centered top
-            x = SCREEN_WIDTH//2 - stretch_w//2 + 160
-            y = 25
+                    width = int(stretch_w * ratio)
 
-            filtered.blit(crop, (x, y))
-    
-        # -----------------------
-        # GAUGE
-        # -----------------------
-        gauge = self.loader.get_image("gauge")
+                    crop = pygame.Surface((width, stretch_h), pygame.SRCALPHA)
+                    crop.blit(boss_bar, (0,0), (0,0,width,stretch_h))
 
-            # draw MP (below HP)
-            filtered.blit(mp_crop, (base_x, base_y + 12))
+                    # centered top
+                    x = SCREEN_WIDTH//2 - stretch_w//2 + 160
+                    y = 25
 
-            value = int(self.player.time_energy)
-            digits = list(str(value))
-        
-            # -----------------------
-            # GAUGE
-            # -----------------------
-            gauge = self.loader.get_image("gauge")
-        gauge_rect = gauge.get_rect(midtop=(
-            SCREEN_WIDTH // 2 + OFFSET_X,
-            -15  # small padding from top
-        ))
+                    filtered.blit(crop, (x, y))
+            
+                # -----------------------
+                # GAUGE
+                # -----------------------
+                gauge = self.loader.get_image("gauge")
 
-            OFFSET_X = 15
+                # draw MP (below HP)
+                filtered.blit(mp_crop, (base_x, base_y + 12))
 
-            gauge_rect = gauge.get_rect(midtop=(
+                value = int(self.player.time_energy)
+                digits = list(str(value))
+            
+                # -----------------------
+                # GAUGE
+                # -----------------------
+                gauge = self.loader.get_image("gauge")
+                gauge_rect = gauge.get_rect(midtop=(
                 SCREEN_WIDTH // 2 + OFFSET_X,
-                -7  # small padding from top
+                -15  # small padding from top
             ))
 
-            filtered.blit(gauge, gauge_rect)
+                gauge_rect = gauge.get_rect(midtop=(
+                    SCREEN_WIDTH // 2 + OFFSET_X,
+                    -7  # small padding from top
+                ))
 
-            # -----------------------
-            # TIME
-            # -----------------------
-            value = int(self.player.time_energy)
-            value = max(0, min(999, value))  # clamp
+                filtered.blit(gauge, gauge_rect)
 
-            digits = list(str(value))
+                # -----------------------
+                # TIME
+                # -----------------------
+                value = int(self.player.time_energy)
+                value = max(0, min(999, value))  # clamp
 
-            digit_images = [
-                self.loader.get_image(f"time_number_sprite_{d}")
-                for d in digits
-            ]
+                digits = list(str(value))
 
-            spacing = 2
-        # --- adjust these ---
-        circle_center_x = SCREEN_WIDTH // 2 + OFFSET_X
-        circle_center_y = 44
-        # --------------------
+                digit_images = [
+                    self.loader.get_image(f"time_number_sprite_{d}")
+                    for d in digits
+                ]
 
-            total_width = sum(img.get_width() for img in digit_images) + spacing * (len(digit_images) - 1)
+                spacing = 2
+                # --- adjust these ---
+                circle_center_x = SCREEN_WIDTH // 2 + OFFSET_X
+                circle_center_y = 44
+                # --------------------
 
-            # --- adjust these ---
-            circle_center_x = SCREEN_WIDTH // 2 + OFFSET_X
-            circle_center_y = 52
-            # --------------------
+                total_width = sum(img.get_width() for img in digit_images) + spacing * (len(digit_images) - 1)
 
-            start_x = circle_center_x - total_width // 2
 
-            x = start_x
-            for img in digit_images:
-                y = circle_center_y - img.get_height() // 2
-                filtered.blit(img, (x, y))
-                x += img.get_width() + spacing
+                start_x = circle_center_x - total_width // 2
 
-            # -----------------------
-            # DRAW PLAYER ON TOP (NOT FILTERED)
-            # -----------------------
+                x = start_x
+                for img in digit_images:
+                    y = circle_center_y - img.get_height() // 2
+                    filtered.blit(img, (x, y))
+                    x += img.get_width() + spacing
+
+                # -----------------------
+                # DRAW PLAYER ON TOP (NOT FILTERED)
+                # -----------------------
             self.player.draw(filtered)
-        
-            # -----------------------
-            # SCALE + DISPLAY
-            # -----------------------
+            
+                # -----------------------
+                # SCALE + DISPLAY
+                # -----------------------
             scaled = pygame.transform.scale(
                 filtered,
                 (SCREEN_WIDTH * GAME_SCALE, SCREEN_HEIGHT * GAME_SCALE)
             )
-
         
         self._display.blit(scaled, (0,0))
         pygame.display.flip()

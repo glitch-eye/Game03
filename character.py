@@ -303,7 +303,7 @@ class Character:
                 return
             self.pay_attack_cost()            
 
-            if not self._grounded:
+            if not self._grounded and self._coyoteTimer == 0:
                 if self._inputUp:
                     self.start_attack("air_up")
                 elif self._inputDown:
@@ -1201,7 +1201,7 @@ class Character:
         self._comboIndex = 0
 
         # reset to a safe animation immediately
-        if not self._grounded:
+        if not self._grounded and self._coyoteTimer <= 0:
             if self._vel.y < 0:
                 self.set_animation("jump", True)
             else:
