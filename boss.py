@@ -21,6 +21,7 @@ class Boss:
             "dash": loader.get_animation("marisa_dash"),
             "undershot": loader.get_animation("marisa_undershot"),
             "shot": loader.get_animation("marisa_shot"),
+            "supershot": loader.get_animation("marisa_supershot"),
         }
 
         self.timeshot = loader.get_animation("marisa_timeshot")
@@ -29,6 +30,14 @@ class Boss:
         self.after_effect = loader.get_animation("marisa_after_effect")
         self.after_effect_s = loader.get_animation("marisa_after_effect_s")
         self.shot = loader.get_animation("marisa_shot_a")
+        self.zangai_frames = loader.get_animation("marisa_zangai")
+
+        self.supershot = {
+            "a": loader.get_animation("marisa_supershot_a"),
+            "b": loader.get_animation("marisa_supershot_b"),
+            "c": loader.get_animation("marisa_supershot_c"),
+            "d": loader.get_animation("marisa_supershot_d"),
+        }
 
         self._pattern = [
             "timeshot_rl",
@@ -99,7 +108,7 @@ class Boss:
         self.target_x = 0
 
         # visibility
-        self.visible = True
+        self.visible = False
 
         # timeshot
         self.timeshot_drop_timer = 0
@@ -172,7 +181,7 @@ class Boss:
                 self.pos.x = target_x
                 self.pos.y = target_y
                 self.state = "intro_turn"
-                self.set_animation("standing_turn", restart=True)
+                self.set_animation("standing_turn")
 
         # --- TURN (RIGHT → LEFT) ---
         elif self.state == "intro_turn":
@@ -187,7 +196,7 @@ class Boss:
             self.hold_timer -= dt
             if self.hold_timer <= 0:
                 self.state = "intro_descend"
-                self.set_animation("sit_down", restart=True)
+                self.set_animation("sit_down")
 
         # --- DESCEND ---
         elif self.state == "intro_descend":
@@ -310,6 +319,7 @@ class Boss:
 
             screen.blit(ghost, rect)
 
+        pygame.draw.rect(screen, (0, 0, 255), self.rect.move(int(-camera_x), int(-camera_y)), 2)  # debug hitbox
         screen.blit(image, self.rect.move(int(-camera_x), int(-camera_y)))
 
         for p in self.dash_particles:
@@ -419,7 +429,7 @@ class Boss:
                 self.pos.x += direction * 350 * dt
             else:
                 self.attack_state = "turn"
-                self.set_animation("sitting_turn", restart=True)
+                self.set_animation("sitting_turn")
 
         # -----------------------
         # SIT TURN → END ATTACK
@@ -461,7 +471,8 @@ class Boss:
             self.shot,              # projectile animation
             self.facing_right,      # boss direction
             self.after_effect,
-            self.after_effect_s     # trail animation
+            self.after_effect_s,     # trail animation
+            scale_frames(self.zangai_frames, 0.6667)
         )
         self.game.enemy_projectiles.append(proj)
 
@@ -472,7 +483,7 @@ class Boss:
         # -----------------------
         if self.attack_state is None:
             self.attack_state = "standup"
-            self.set_animation("stand_up", restart=True)
+            self.set_animation("stand_up")
 
         # -----------------------
         # STAND UP ANIMATION
@@ -537,7 +548,7 @@ class Boss:
                 self.pos.y += dy / dist * speed * dt
             else:
                 self.attack_state = "turn"
-                self.set_animation("standing_turn", restart=True)
+                self.set_animation("standing_turn")
 
         # -----------------------
         # PHASE 2 — MID-AIR TURN
@@ -597,7 +608,8 @@ class Boss:
                     spawn_x,
                     spawn_y,
                     self.undershot,
-                    self.laser
+                    self.laser,
+                    scale_frames(self.zangai_frames, 1.5)
                 )
 
                 self.game.enemy_projectiles.append(proj)
@@ -609,7 +621,7 @@ class Boss:
             else:
                 self.pos.x = desired_x
                 self.attack_state = "end_turn"
-                self.set_animation("standing_turn", restart=True)
+                self.set_animation("standing_turn")
         # -----------------------
         # PHASE 5 — END TURN
         # -----------------------
@@ -653,7 +665,7 @@ class Boss:
         # -----------------------
         if self.attack_state is None:
             self.attack_state = "standup"
-            self.set_animation("stand_up", restart=True)
+            self.set_animation("stand_up")
 
         # -----------------------
         # STAND UP AND ASCEND
@@ -830,7 +842,7 @@ class Boss:
                 self.pos.y += dy / dist * speed * dt
             else:
                 self.attack_state = "turn1"
-                self.set_animation("standing_turn", restart=True)
+                self.set_animation("standing_turn")
 
         # -----------------------
         # PHASE 2 — TURN TOWARD PLAYER
@@ -855,7 +867,7 @@ class Boss:
                 self.pos.x += direction * 360 * dt
             else:
                 self.attack_state = "turn2"
-                self.set_animation("standing_turn", restart=True)
+                self.set_animation("standing_turn")
 
         # -----------------------
         # PHASE 4 — TURN AGAIN
@@ -864,7 +876,7 @@ class Boss:
             if self.frame_index >= len(self.frames) - 1:
                 self.facing_right = not self.facing_right
                 self.attack_state = "descend"
-                self.set_animation("sit_down", restart=True)
+                self.set_animation("sit_down")
 
         # -----------------------
         # PHASE 5 — DESCEND TO LOW HEIGHT
@@ -895,3 +907,10 @@ class Boss:
                 self.transition_state = None
 
                 self.state = "intro_done"
+    
+def scale_frames(frames, scale):
+    scaled = []
+    for f in frames:
+        w, h = f.get_size()
+        scaled.append(pygame.transform.scale(f, (int(w*scale), int(h*scale))))
+    return scaled
