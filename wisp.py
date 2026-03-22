@@ -83,7 +83,7 @@ class Wisp:
             
             #check attacking
             if self.did_hit(player):
-                player.take_damage(self._pos.x)
+                player.apply_damage(WISP_DAMAGE, self._pos.x)
 
             # move toward player
             self._pos += direction * self._speed * dt
@@ -219,7 +219,7 @@ class Goblin:
         # check hit player if attacking (hit box increase from frame 15 - 21 and then reduce)
         if self._attack:
             if self.did_hit(player):
-                player.take_damage(self._pos.x)
+                player.apply_damage(GOB_DAMAGE, self._pos.x)
 
         #hit check
         if self._health > 0:
