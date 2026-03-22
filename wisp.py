@@ -215,12 +215,6 @@ class Goblin:
     #----------------------
     def update(self, dt, player, knives):
         """Update animation, position based on dt, attack if player_pos in range"""
-        player_rect = player._rect
-        # check hit player if attacking (hit box increase from frame 15 - 21 and then reduce)
-        if self._attack:
-            if self.did_hit(player):
-                player.apply_damage(GOB_DAMAGE, self._pos.x)
-
         #hit check
         if self._health > 0:
             if self.is_hit(knives):
@@ -230,6 +224,12 @@ class Goblin:
                     self._frames = self._animations["die"]
                     self._frame_index = 0
                     self._image = self._frames[0]
+
+        player_rect = player._rect
+        # check hit player if attacking (hit box increase from frame 15 - 21 and then reduce)
+        if self._attack:
+            if self.did_hit(player) and self._health > 0:
+                player.apply_damage(GOB_DAMAGE, self._pos.x)
 
         if self._health > 0:
             # sight seeing
