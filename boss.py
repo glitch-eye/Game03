@@ -132,8 +132,13 @@ class Boss:
         self.speed = 0
 
         # HP
-        self.hp = 300
-        self.max_hp = 300
+        self.hp = 1500
+        self.max_hp = 1500
+        self._dead = False
+        # hurt flash system
+        self._hit = False
+        self._shake_timer = 0
+        self._shake_duration = 8
 
     def arena_left(self):  return self.arena.left
     def arena_right(self): return self.arena.right
@@ -247,6 +252,23 @@ class Boss:
             self.update_post_dash_recover(dt)
         self.update_animation(dt)
         self.rect.midtop = (int(self.pos.x), int(self.pos.y))
+        self.update_hurtbox()
+
+        player_hurtbox = self.player.get_hurtbox_rect()
+
+        if self.hurtbox.colliderect(player_hurtbox):
+            # self.player.apply_damage(10, self.hurtbox.centerx)
+            print("you suck lol")
+
+        if self.is_hit(knives):
+            self._hit_flash = True
+
+        # --- hurt flash update ---
+        if self._hit:
+            self._shake_timer += dt
+            if self._shake_timer >= 1 / self._shake_duration:
+                self._shake_timer = 0
+                self._hit = False
 
         # -----------------------
         # BOSS AFTERIMAGES
@@ -298,6 +320,10 @@ class Boss:
 
         if not self.facing_right:
             image = pygame.transform.flip(image, True, False)
+        
+        # apply red flash if hit
+        if self._hit:
+            image = self.apply_flash()
 
         # -----------------------
         # DRAW AFTERIMAGES
@@ -319,7 +345,27 @@ class Boss:
 
             screen.blit(ghost, rect)
 
-        pygame.draw.rect(screen, (0, 0, 255), self.rect.move(int(-camera_x), int(-camera_y)), 2)  # debug hitbox
+        # Build mask from current sprite frame
+        mask = pygame.mask.from_surface(image)
+        bbox = mask.get_bounding_rects()
+
+        if bbox:
+            # mask may return multiple regions; use largest
+            largest = max(bbox, key=lambda r: r.width * r.height)
+
+            tight_rect = pygame.Rect(
+                self.rect.left + largest.left,
+                self.rect.top + largest.top,
+                largest.width,
+                largest.height
+            )
+
+            pygame.draw.rect(
+                screen,
+                (0, 0, 255),
+                tight_rect.move(int(-camera_x), int(-camera_y)),
+                2
+            ) # debug hitbox
         screen.blit(image, self.rect.move(int(-camera_x), int(-camera_y)))
 
         for p in self.dash_particles:
@@ -907,6 +953,68 @@ class Boss:
                 self.transition_state = None
 
                 self.state = "intro_done"
+
+    def update_hurtbox(self):
+        mask = pygame.mask.from_surface(self.image)
+        rects = mask.get_bounding_rects()
+
+        if rects:
+            largest = max(rects, key=lambda r: r.width * r.height)
+
+            self.hurtbox = pygame.Rect(
+                self.rect.left + largest.left,
+                self.rect.top + largest.top,
+                largest.width,
+                largest.height
+            )
+        else:
+            self.hurtbox = self.rect.copy()
+
+    def is_hit(self, knives):
+        # group knives in batches of 3 (same as your enemies)
+        for i in range(0, len(knives), 3):
+            group = knives[i:i+3]
+
+            rect_left   = min(k.rect.left   for k in group)
+            rect_top    = min(k.rect.top    for k in group)
+            rect_right  = max(k.rect.right  for k in group)
+            rect_bottom = max(k.rect.bottom for k in group)
+
+            # check overlap with boss HURTBOX (not body rect)
+            if (rect_left <= self.hurtbox.right and rect_right >= self.hurtbox.left
+                and rect_top <= self.hurtbox.bottom and rect_bottom >= self.hurtbox.top):
+
+                # kill knives
+                for k in group:
+                    k.alive = False
+
+                # damage boss (15 per knife × knives in group)
+                self.take_damage(5 * len(group))
+
+                return True
+
+        return False
+    
+    def take_damage(self, amount):
+        if self._dead:
+            return
+
+        self.hp -= amount
+
+        # trigger red flash
+        self._hit = True
+        self._shake_timer = 0
+
+        if self.hp <= 0:
+            self.hp = 0
+            self._dead = True
+    
+    def apply_flash(self, color=(255, 0, 0), alpha=120):
+        flash_img = self.image.copy()
+        tint = pygame.Surface(self.image.get_size(), pygame.SRCALPHA)
+        tint.fill((*color, alpha))
+        flash_img.blit(tint, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+        return flash_img
     
 def scale_frames(frames, scale):
     scaled = []
@@ -914,3 +1022,4 @@ def scale_frames(frames, scale):
         w, h = f.get_size()
         scaled.append(pygame.transform.scale(f, (int(w*scale), int(h*scale))))
     return scaled
+

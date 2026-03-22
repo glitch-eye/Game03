@@ -18,7 +18,7 @@ class DashTrail:
         self.rect = self.image.get_rect(center=self.pos)
         self.alive = True
 
-    def update(self, dt):
+    def update(self, dt, player=None):
         self.frame_timer += dt
         if self.frame_timer >= self.frame_speed:
             self.frame_timer = 0
@@ -50,7 +50,7 @@ class ZangaiTrail:
         self.life = 0.22  # short lived
         self.alive = True
 
-    def update(self, dt):
+    def update(self, dt, player=None):
         self.life -= dt
         if self.life <= 0:
             self.alive = False
@@ -78,20 +78,22 @@ class SmokeColumn:
         self.base_pos = pygame.Vector2(pos)
 
         # how tall the column is (number of stacked sprites)
-        self.layers = random.randint(5, 5)
-        self.spacing = frames[0].get_height() - 10  # dense overlap
+        self.layers = random.randint(4, 4)
+        frame = frames[0]
+        width = frame.get_width()
+        h = frame.get_height()
 
-        # Build tall hitbox
-        width = frames[0].get_width()
-        height = self.layers * self.spacing
+        overlap = h * 0.45
+        height = int(h + (self.layers - 1) * overlap)
         self.rect = pygame.Rect(0, 0, width, height)
         self.rect.midbottom = self.base_pos
 
         self.alive = True
         self.life_timer = 0
         self.life_duration = 2.0
+        self.hitbox = None
 
-    def update(self, dt):
+    def update(self, dt, player):
         self.rect.y -= 20 * dt
 
         self.life_timer += dt
@@ -104,6 +106,12 @@ class SmokeColumn:
         if self.frame_timer >= self.frame_speed:
             self.frame_timer = 0
             self.frame_index = (self.frame_index + 1) % len(self.frames)
+
+        self.hitbox = self.rect.copy()
+
+        if self.hitbox and self.hitbox.colliderect(player.get_hurtbox_rect()):
+            # player.apply_damage(0, self.rect.centerx)
+            print("smoked")
     
     def draw(self, screen, camera_x, camera_y):
         frame = self.frames[self.frame_index]
@@ -124,6 +132,13 @@ class SmokeColumn:
             y = base_y - h - i * overlap
 
             screen.blit(frame, (x - camera_x, y - camera_y))
+        
+        if self.hitbox:
+            pygame.draw.rect(
+            screen, (0,0,255),
+            self.hitbox.move(int(-camera_x), int(-camera_y)),
+            2
+            )
 
 class TimeShotProjectile:
     def __init__(self, pos, facing_right, loader):
@@ -144,11 +159,12 @@ class TimeShotProjectile:
         self.fall_speed = 350
 
         self.rect = self.image.get_rect(center=self.pos)
+        self.hitbox = None
 
         # STANDARDIZED LIFETIME
         self.alive = True
 
-    def update(self, dt, player_rect, particle_list):
+    def update(self, dt, player, particle_list):
         # Fall
         self.pos.y += self.fall_speed * dt
 
@@ -192,6 +208,7 @@ class UndershotProjectile:
 
         self.image = self.frames[0]
         self.rect = self.image.get_rect(center=(x, y))
+        self.hitbox = None
 
         self.vel = pygame.Vector2(0, 480)
 
@@ -206,7 +223,7 @@ class UndershotProjectile:
         # TRUE physics ground
         self.ground_y = BOSS_ARENA.bottom + 70
 
-    def update(self, dt, player_rect=None, particle_list=None):
+    def update(self, dt, player=None, particle_list=None):
 
         # -----------------------
         # PROJECTILE FALL
@@ -251,6 +268,18 @@ class UndershotProjectile:
                     self.frame_index = 0
 
             self.image = self.frames[self.frame_index]
+                
+        if self.state == "laser":
+            self.hitbox = get_tight_hitbox(self.image, self.rect, "midbottom")
+            if self.hitbox.colliderect(player.get_hurtbox_rect()):
+                # player.apply_damage(20, self.hitbox.centerx)
+                print("lasered")
+        else:
+            self.hitbox = get_tight_hitbox(self.image, self.rect, "center")
+            if self.hitbox.colliderect(player.get_hurtbox_rect()):
+                # player.apply_damage(10, self.hitbox.centerx)
+                print("boomed")
+
 
     def _become_laser(self):
         self.state = "laser"
@@ -273,9 +302,12 @@ class UndershotProjectile:
         self.rect = self.image.get_rect(
             midbottom=(self.rect.centerx, BOSS_ARENA.bottom + 70)
         )
+        self.hitbox = get_tight_hitbox(self.image, self.rect, "midbottom")
 
     def draw(self, screen, camera_x, camera_y):
         screen.blit(self.image, self.rect.move(int(-camera_x), int(-camera_y)))
+        pygame.draw.rect(screen, (0,0,255),
+                 self.hitbox.move(int(-camera_x), int(-camera_y)), 2)
 
 class ShotProjectile:
     def __init__(self, start, first_target, frames, facing_right, trail_big, trail_small, zangai_frames):
@@ -287,6 +319,7 @@ class ShotProjectile:
         self.image = self.frames[0]
         self.pos = pygame.Vector2(start)
         self.rect = self.image.get_rect(center=self.pos)
+        self.hitbox = None
 
         # Direction
         self.facing_right = facing_right
@@ -320,7 +353,7 @@ class ShotProjectile:
 
         self.alive = True
 
-    def update(self, dt, player_rect, particle_list):
+    def update(self, dt, player, particle_list):
         self.phase_timer += dt
 
         # -----------------------
@@ -333,7 +366,7 @@ class ShotProjectile:
                 self.phase = 2
                 self.phase_timer = 0
                 self.velocity = pygame.Vector2(0, 0)
-                self.target = pygame.Vector2(player_rect.center)
+                self.target = pygame.Vector2(player._rect.center)
 
         self.zangai_timer += dt
 
@@ -436,5 +469,13 @@ class ShotProjectile:
             self.frame_index = (self.frame_index + 1) % len(self.frames)
             self.image = self.frames[self.frame_index]
 
+        self.hitbox = get_tight_hitbox(self.image, self.rect, "center")
+        if self.hitbox.colliderect(player.get_hurtbox_rect()):
+            # player.apply_damage(15, self.hitbox.centerx)
+            print("shot")
+            self.alive = False
+
     def draw(self, screen, camera_x, camera_y):
         screen.blit(self.image, self.rect.move(int(-camera_x), int(-camera_y)))
+        pygame.draw.rect(screen, (0,0,255),
+                 self.hitbox.move(int(-camera_x), int(-camera_y)), 2)

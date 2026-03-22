@@ -73,3 +73,20 @@ def tint_surface_red(surface):
     tinted = surface.copy()
     tinted.fill((255, 60, 60, 180), special_flags=pygame.BLEND_RGBA_MULT)
     return tinted
+
+def get_tight_hitbox(image, anchor_rect, anchor="center"):
+    mask = pygame.mask.from_surface(image)
+    rects = mask.get_bounding_rects()
+
+    if not rects:
+        return anchor_rect.copy()
+
+    r = max(rects, key=lambda x: x.width * x.height)
+    tight = pygame.Rect(0, 0, r.width, r.height)
+
+    if anchor == "center":
+        tight.center = anchor_rect.center
+    elif anchor == "midbottom":
+        tight.midbottom = anchor_rect.midbottom
+
+    return tight

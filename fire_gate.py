@@ -52,7 +52,7 @@ class FireGate:
         # -----------------------
         # COLLISION CHECK
         # -----------------------
-        if self.rect.colliderect(player._rect):
+        if self.rect.colliderect(player.get_hurtbox_rect()):
 
             # Player immune to fire?
             if not player.get_fire():

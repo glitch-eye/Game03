@@ -360,6 +360,15 @@ class Character:
     # -----------------------
 
     def update(self, dt):
+        # hitbox update
+        if self.player_sliding or self._crouching:
+            self._hurtbox.x = PLAYER_CROUCH_HURTBOX_WIDTH
+            self._hurtbox.y = PLAYER_CROUCH_HURTBOX_HEIGHT
+        else:
+            self._hurtbox.x = PLAYER_HURTBOX_WIDTH
+            self._hurtbox.y = PLAYER_HURTBOX_HEIGHT
+
+
         # 2nd jump effect 2
         for effect in self.double_jump_effects[:]:
             effect["timer"] += dt
@@ -1005,8 +1014,15 @@ class Character:
         # convert world → screen while preserving anchor
         screen_rect = draw_rect.move(-camera_x, -camera_y)
 
-        # debug collision box
-        # pygame.draw.rect(screen, (255, 0, 0), screen_rect.move())
+        # debug hit box
+        hurtbox = self.get_hurtbox_rect()
+
+        pygame.draw.rect(
+            screen,
+            (0, 255, 0),
+            hurtbox.move(int(-camera_x), int(-camera_y)),
+            2
+        )
 
         # draw sprite
         screen.blit(image, screen_rect)
@@ -1438,3 +1454,8 @@ class Character:
 
     def get_fire(self):
         return self.fire_immune
+    
+    def get_hurtbox_rect(self):
+        rect = pygame.Rect(0, 0, self._hurtbox.x, self._hurtbox.y)
+        rect.midbottom = self._rect.midbottom
+        return rect

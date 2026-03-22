@@ -284,10 +284,10 @@ class Game:
 
             # --- Update enemy particles ---
             for p in self.enemy_particles:
-                p.update(dt)
+                p.update(dt, self.player)
 
             for proj in self.enemy_projectiles:
-                proj.update(dt, self.player._rect, self.enemy_particles)
+                proj.update(dt, self.player, self.enemy_particles)
 
             self.enemy_particles = [p for p in self.enemy_particles if p.alive]
 
