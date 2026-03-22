@@ -40,6 +40,7 @@ class Wisp:
         self._frame_index = 0
         self._anim_speed = 8
         self._anim_timer = 0
+        self.spawn_freeze_timer = 10.0 # freeze for 10 seconds after spawn
 
         self._image = self._frames[0]
         self._rect = self._image.get_rect(center=self._pos)
@@ -55,6 +56,10 @@ class Wisp:
     # -----------------------
 
     def update(self, dt, player_pos, knives):
+        if self.spawn_freeze_timer > 0:
+            self.spawn_freeze_timer -= dt
+            return
+        
         if self._alive:
             if self.is_hit(knives):
                 self._frames = self._ded_frames
