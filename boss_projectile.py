@@ -30,11 +30,11 @@ class DashTrail:
 
         self.rect.center = self.pos
 
-    def draw(self, screen):
+    def draw(self, screen, camera_x, camera_y):
         img = self.image
         if not self.facing_right:
             img = pygame.transform.flip(img, True, False)
-        screen.blit(img, self.rect)
+        screen.blit(img, self.rect.move(int(-camera_x), int(-camera_y)))
 
 class SmokeColumn:
     def __init__(self, pos, frames):
@@ -73,7 +73,7 @@ class SmokeColumn:
             self.frame_timer = 0
             self.frame_index = (self.frame_index + 1) % len(self.frames)
     
-    def draw(self, screen):
+    def draw(self, screen, camera_x, camera_y):
         frame = self.frames[self.frame_index]
         w = frame.get_width()
         h = frame.get_height()
@@ -91,7 +91,7 @@ class SmokeColumn:
             x = base_x - w // 2
             y = base_y - h - i * overlap
 
-            screen.blit(frame, (x, y))
+            screen.blit(frame, (x - camera_x, y - camera_y))
 
 class TimeShotProjectile:
     def __init__(self, pos, facing_right, loader):
@@ -121,7 +121,8 @@ class TimeShotProjectile:
         self.pos.y += self.fall_speed * dt
 
         # Remove when offscreen
-        if self.pos.y > SCREEN_HEIGHT:
+        ground_y = BOSS_ARENA.bottom
+        if self.pos.y >= ground_y + 50:
             self.alive = False
 
             explosion_pos = pygame.Vector2(self.rect.midbottom)
@@ -140,11 +141,11 @@ class TimeShotProjectile:
 
         self.rect.center = self.pos
 
-    def draw(self, screen):
+    def draw(self, screen, camera_x, camera_y):
         img = self.image
         if not self.facing_right:
             img = pygame.transform.flip(img, True, False)
-        screen.blit(img, self.rect)
+        screen.blit(img, self.rect.move(int(-camera_x), int(-camera_y)))
 
 
 class UndershotProjectile:
@@ -166,7 +167,7 @@ class UndershotProjectile:
         self.alive = True
 
         # TRUE physics ground
-        self.ground_y = SCREEN_HEIGHT
+        self.ground_y = BOSS_ARENA.bottom + 70
 
     def update(self, dt, player_rect=None, particle_list=None):
 
@@ -217,11 +218,11 @@ class UndershotProjectile:
 
         # Anchor to bottom center of screen
         self.rect = self.image.get_rect(
-            midbottom=(self.rect.centerx, SCREEN_HEIGHT)
+            midbottom=(self.rect.centerx, BOSS_ARENA.bottom + 70)
         )
 
-    def draw(self, screen):
-        screen.blit(self.image, self.rect)
+    def draw(self, screen, camera_x, camera_y):
+        screen.blit(self.image, self.rect.move(int(-camera_x), int(-camera_y)))
 
 class ShotProjectile:
     def __init__(self, start, first_target, frames, facing_right, trail_big, trail_small):
@@ -252,7 +253,7 @@ class ShotProjectile:
         self.speed_phase2 = 500
 
         self.fly_time = 0
-        self.max_fly_time = 0.35
+        self.max_fly_time = 10.0
 
         direction = (self.target - self.pos)
         if direction.length() != 0:
@@ -288,9 +289,12 @@ class ShotProjectile:
                 self.velocity = direction * self.speed_phase2
                 self.pos += self.velocity * dt
             else:
-                # Instead of dying, enter fly-through phase
                 self.phase = 3
                 self.fly_time = 0
+
+                # keep strong forward motion
+                if self.velocity.length() != 0:
+                    self.velocity = self.velocity.normalize() * self.speed_phase2
 
         # -----------------------
         # PHASE 3 — Fly-through
@@ -300,7 +304,8 @@ class ShotProjectile:
             self.pos += self.velocity * dt
 
             # Hit ground
-            if self.pos.y >= SCREEN_HEIGHT - 10:
+            ground_y = BOSS_ARENA.bottom
+            if self.pos.y >= ground_y + 50:
                 self.alive = False
                 return
 
@@ -357,5 +362,5 @@ class ShotProjectile:
             self.frame_index = (self.frame_index + 1) % len(self.frames)
             self.image = self.frames[self.frame_index]
 
-    def draw(self, screen):
-        screen.blit(self.image, self.rect)
+    def draw(self, screen, camera_x, camera_y):
+        screen.blit(self.image, self.rect.move(int(-camera_x), int(-camera_y)))

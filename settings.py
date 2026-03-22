@@ -80,7 +80,7 @@ GOB_SIGHT_ANGLE = 30
 
 # Boss base stats
 BOSS_INIT_POS = pygame.Vector2(320, -100)
-BOSS_ARENA = pygame.Rect(0, 0, 640, 360)
+BOSS_ARENA = pygame.Rect(3436, 324, 1516, 692)
 
 #Items
 ITEM_COLLECT_RANGE = 30

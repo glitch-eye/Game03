@@ -42,11 +42,13 @@ class Boss:
         ]
 
         self.height_levels = {
-            "high": 90,
-            "mid": 150,
-            "low": 210,
-            "dash": 240,
+            "high": 810,
+            "mid": 870,
+            "low": 930,
+            "dash": 960,
         }
+        
+        self.arena = BOSS_ARENA
 
         self.fast_anims = {
             "standing_turn",
@@ -73,7 +75,7 @@ class Boss:
         # -----------------------
         # POSITION
         # -----------------------
-        self.pos = pygame.Vector2(-140, -120)  # offscreen top-left
+        self.pos = pygame.Vector2(3436, 324)  # offscreen top-left
         self.rect = self.image.get_rect(midtop=(int(self.pos.x), int(self.pos.y)))
 
         # -----------------------
@@ -124,6 +126,11 @@ class Boss:
         self.hp = 300
         self.max_hp = 300
 
+    def arena_left(self):  return self.arena.left
+    def arena_right(self): return self.arena.right
+    def arena_top(self):   return self.arena.top
+    def arena_bottom(self):return self.arena.bottom
+
     # -----------------------
     # ANIMATION SWITCH
     # -----------------------
@@ -146,7 +153,7 @@ class Boss:
     # -----------------------
     def update_intro(self, dt):
         player_x = self.player._pos.x
-        target_x = player_x + 200
+        target_x = player_x + 250
         target_y = self.height_levels["high"]
         low_y = self.height_levels["low"]
 
@@ -185,8 +192,11 @@ class Boss:
         # --- DESCEND ---
         elif self.state == "intro_descend":
             if abs(self.pos.y - low_y) > 3:
-                self.pos.y += 140 * dt
+                self.pos.y += 325 * dt
             else:
+                self.pos.y = low_y
+
+            if self.pos.y > low_y:
                 self.pos.y = low_y
 
             if self.frame_index >= len(self.frames) - 1:
@@ -235,7 +245,7 @@ class Boss:
         self.afterimage_timer += dt
 
         # --- NORMAL SPEED TRAIL ---
-        if self.speed < 500:
+        if self.speed < 600:
             if self.afterimage_timer >= 0.175:
                 self.afterimage_timer = 0
 
@@ -272,7 +282,7 @@ class Boss:
     # -----------------------
     # DRAW
     # -----------------------
-    def draw(self, screen):
+    def draw(self, screen, camera_x, camera_y):
         if not self.visible:
             return
         image = self.image
@@ -293,17 +303,17 @@ class Boss:
 
             ghost.set_alpha(alpha)
 
-            rect = ghost.get_rect(midtop=(int(img["pos"].x), int(img["pos"].y)))
+            rect = ghost.get_rect(midtop=(int(img["pos"].x-camera_x), int(img["pos"].y-camera_y)))
 
             if not self.facing_right:
                 ghost = pygame.transform.flip(ghost, True, False)
 
             screen.blit(ghost, rect)
 
-        screen.blit(image, self.rect)
+        screen.blit(image, self.rect.move(int(-camera_x), int(-camera_y)))
 
         for p in self.dash_particles:
-            p.draw(screen)
+            p.draw(screen, camera_x, camera_y)
 
     def update_pattern(self, dt):
         if self.state != "intro_done":
@@ -358,20 +368,20 @@ class Boss:
             self.dash_target_x = None
 
         # -----------------------
-        # ADJUST (move to 300px from player)
+        # ADJUST (move to 400px from player)
         # -----------------------
         if self.attack_state == "adjust":
 
             if self.adjust_target_x is None:
                 player_x = self.player._pos.x
-                offset = 300 if (self.pos.x - player_x) > 0 else -300
+                offset = 350 if (self.pos.x - player_x) > 0 else -350
                 self.adjust_target_x = player_x + offset
 
             dx = self.adjust_target_x - self.pos.x
 
             if abs(dx) > 4:
                 direction = 1 if dx > 0 else -1
-                self.pos.x += direction * 225 * dt
+                self.pos.x += direction * 325 * dt
             else:
                 self.pos.x = self.adjust_target_x
                 self.adjust_target_x = None
@@ -398,9 +408,9 @@ class Boss:
 
             # Target opposite side, but relative to player's CURRENT position
             if self.dash_to_right:
-                desired_x = player_x + 300
+                desired_x = player_x + 350
             else:
-                desired_x = player_x - 300
+                desired_x = player_x - 350
 
             dx = desired_x - self.pos.x
 
@@ -513,16 +523,16 @@ class Boss:
             target_y = self.height_levels["high"]
 
             if self.rise_to_right:
-                target_x = player_x + 250
+                target_x = player_x + 300
             else:
-                target_x = player_x - 250
+                target_x = player_x - 300
 
             dx = target_x - self.pos.x
             dy = target_y - self.pos.y
             dist = math.hypot(dx, dy)
 
             if dist > 5:
-                speed = 275
+                speed = 375
                 self.pos.x += dx / dist * speed * dt
                 self.pos.y += dy / dist * speed * dt
             else:
@@ -545,13 +555,13 @@ class Boss:
 
             player_x = self.player_pos.x
             dx = self.pos.x - player_x
-            desired_gap = 250
+            desired_gap = 350
 
             if abs(abs(dx) - desired_gap) > 5:
                 direction = 1 if dx > 0 else -1
                 target_x = player_x + direction * desired_gap
                 move_dir = 1 if target_x > self.pos.x else -1
-                self.pos.x += move_dir * 225 * dt
+                self.pos.x += move_dir * 325 * dt
             else:
                 boss_on_right = dx > 0
                 self.dash_to_right = not boss_on_right
@@ -570,9 +580,9 @@ class Boss:
 
             # Desired final spacing on opposite side
             if self.dash_to_right:
-                desired_x = player_x + 250
+                desired_x = player_x + 350
             else:
-                desired_x = player_x - 250
+                desired_x = player_x - 350
 
             dx = desired_x - self.pos.x
 
@@ -654,7 +664,7 @@ class Boss:
             target_y = self.height_levels["mid"]
 
             if abs(self.pos.y - target_y) > 4:
-                self.pos.y -= 225 * dt
+                self.pos.y -= 325 * dt
             else:
                 self.pos.y = target_y
 
@@ -676,10 +686,14 @@ class Boss:
 
             direction = 1 if self.dash_to_right else -1
             self.fake_dash_dir = direction
-            self.pos.x += direction * 700 * dt
+            self.pos.x += direction * 800 * dt
 
             # Offscreen bounds (extra margin)
-            if self.pos.x < -200 or self.pos.x > SCREEN_WIDTH + 200:
+            cam_left  = self.game.camera_x
+            cam_right = self.game.camera_x + SCREEN_WIDTH
+            margin = 360
+
+            if self.pos.x < cam_left - margin or self.pos.x > cam_right + margin:
                 self.attack_state = "vanish"
 
         # -----------------------
@@ -704,11 +718,15 @@ class Boss:
 
             margin = 220
 
-            if self.real_dash_dir > 0:  # moving right
-                self.pos.x = -margin
+            cam_left  = self.game.camera_x
+            cam_right = self.game.camera_x + SCREEN_WIDTH
+            margin = 220
+
+            if self.real_dash_dir > 0:  # entering from left → moving right
+                self.pos.x = cam_left - margin
                 self.facing_right = True
-            else:  # moving left
-                self.pos.x = SCREEN_WIDTH + margin
+            else:                      # entering from right → moving left
+                self.pos.x = cam_right + margin
                 self.facing_right = False
 
             # Force DASH HEIGHT
@@ -755,13 +773,17 @@ class Boss:
                     DashTrail(spawn_pos, self.after_effect_s, self.facing_right)
                 )
 
-            self.pos.x += self.real_dash_dir * 1000 * dt
+            self.pos.x += self.real_dash_dir * 1100 * dt
 
             # Exit screen
-            if self.pos.x < -260 or self.pos.x > SCREEN_WIDTH + 260:
+            cam_left  = self.game.camera_x
+            cam_right = self.game.camera_x + SCREEN_WIDTH
+            margin = 360
+
+            if self.pos.x < cam_left - margin or self.pos.x > cam_right + margin:
                 self.visible = False
                 self.attack_state = None
-                self.transition_state = None   # safety reset
+                self.transition_state = None
                 self.state = "post_dash_recover"
 
     def update_post_dash_recover(self, dt):
@@ -776,22 +798,26 @@ class Boss:
             self.visible = True
             self.set_animation("stop")
 
-            margin = 240
+            cam_left  = self.game.camera_x
+            cam_right = self.game.camera_x + SCREEN_WIDTH
+
+            margin = 80          # MUCH closer
+            top_y = cam_left  # temp placeholder to keep structure
             top_y = -120
 
-            if self.real_dash_dir < 0:  # exited left → re-enter left
-                self.pos.x = -margin
-                self.facing_right = True   # flying right
-            else:                         # exited right → re-enter right
-                self.pos.x = SCREEN_WIDTH + margin
-                self.facing_right = False  # flying left
+            if self.real_dash_dir < 0:  # exited left
+                self.pos.x = cam_left - margin
+                self.facing_right = True
+            else:                       # exited right
+                self.pos.x = cam_right + margin
+                self.facing_right = False
 
             self.pos.y = top_y
 
         elif self.attack_state == "fly_in":
 
             side = -1 if self.pattern_loop_flipped else 1
-            target_x = player_x + 200 * side
+            target_x = player_x + 225 * side
             target_y = self.height_levels["high"]
 
             dx = target_x - self.pos.x
@@ -799,7 +825,7 @@ class Boss:
             dist = math.hypot(dx, dy)
 
             if dist > 5:
-                speed = 500
+                speed = 600
                 self.pos.x += dx / dist * speed * dt
                 self.pos.y += dy / dist * speed * dt
             else:
@@ -821,12 +847,12 @@ class Boss:
         elif self.attack_state == "move_across":
 
             side = -1 if self.pattern_loop_flipped else 1
-            target_x = player_x - 200 * side
+            target_x = player_x - 300 * side
             dx = target_x - self.pos.x
 
             if abs(dx) > 4:
                 direction = 1 if dx > 0 else -1
-                self.pos.x += direction * 260 * dt
+                self.pos.x += direction * 360 * dt
             else:
                 self.attack_state = "turn2"
                 self.set_animation("standing_turn", restart=True)
@@ -848,8 +874,11 @@ class Boss:
             low_y = self.height_levels["low"]
 
             if abs(self.pos.y - low_y) > 3:
-                self.pos.y += 225 * dt
+                self.pos.y += 325 * dt
             else:
+                self.pos.y = low_y
+
+            if self.pos.y > low_y:
                 self.pos.y = low_y
 
             if self.frame_index >= len(self.frames) - 1:

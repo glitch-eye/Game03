@@ -294,18 +294,27 @@ class Game:
             # -----------------------
             # DRAW WORLD (no player)
             # -----------------------
+            map_width  = MAP_NUMS[0] * TILE_SIZE
+            map_height = MAP_NUMS[1] * TILE_SIZE
+
+            self.camera_x = self.player._pos.x - SCREEN_WIDTH // 2
+            self.camera_y = self.player._pos.y - SCREEN_HEIGHT // 2
+
+            self.camera_x = max(0, min(self.camera_x, map_width  - SCREEN_WIDTH))
+            self.camera_y = max(0, min(self.camera_y, map_height - SCREEN_HEIGHT))
+
             self.wisp.draw(self._screen)
             self.goblin.draw(self._screen, pos)
             self.crystal.draw(self._screen)
             # draw boss
-            self.boss.draw(self._screen)
+            self.boss.draw(self._screen, self.camera_x, self.camera_y)
 
             for knife in self.knives:
-                knife.draw(self._screen)
+                knife.draw(self._screen, self.camera_x, self.camera_y)
             for proj in self.enemy_projectiles:
-                proj.draw(self._screen)
+                proj.draw(self._screen, self.camera_x, self.camera_y)
             for p in self.enemy_particles:
-                p.draw(self._screen)
+                p.draw(self._screen, self.camera_x, self.camera_y)
 
             # -----------------------
             # APPLY FILTER SAFELY
