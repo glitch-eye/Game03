@@ -22,6 +22,8 @@ class Boss:
             "undershot": loader.get_animation("marisa_undershot"),
             "shot": loader.get_animation("marisa_shot"),
             "supershot": loader.get_animation("marisa_supershot"),
+            "ded": loader.get_animation("marisa_des"),
+            "dying": loader.get_animation("marisa_dying"),
         }
 
         self.timeshot = loader.get_animation("marisa_timeshot")
@@ -31,6 +33,13 @@ class Boss:
         self.after_effect_s = loader.get_animation("marisa_after_effect_s")
         self.shot = loader.get_animation("marisa_shot_a")
         self.zangai_frames = loader.get_animation("marisa_zangai")
+
+        self._ded_frames = loader.get_animation("bomb_effect")
+        self._explosions = []          # active explosions
+        self._explosion_timer = 0
+        self._explosion_interval = 0.12
+        self._explosion_duration = 1.8
+        self._explosion_total_time = 0
 
         self.supershot = {
             "a": loader.get_animation("marisa_supershot_a"),
@@ -139,6 +148,9 @@ class Boss:
         self._hit = False
         self._shake_timer = 0
         self._shake_duration = 8
+        # dead
+        self._dying = False 
+        self._dead_anim_done = False
 
     def arena_left(self):  return self.arena.left
     def arena_right(self): return self.arena.right
@@ -226,6 +238,22 @@ class Boss:
             self.frame_timer = 0
             self.frame_index += 1
 
+            # --- DYING ANIMATION ---
+            if self._dying:
+                if self.frame_index >= len(self.frames):
+                    self._dying = False
+                    self._dead = True
+                    self.set_animation("ded", restart=True)
+                    return
+
+            # --- DEAD LOOP ---
+            if self._dead:
+                if self.frame_index >= len(self.frames):
+                    self.frame_index = len(self.frames) - 1  # freeze last frame
+                self.image = self.frames[self.frame_index]
+                return
+
+            # --- NORMAL LOOP ---
             if self.frame_index >= len(self.frames):
                 self.frame_index = 0
 
@@ -244,6 +272,18 @@ class Boss:
         else:
             self.speed = 0
         self.prev_pos = self.pos.copy()
+
+        # -----------------------
+        # DEATH FREEZE
+        # -----------------------
+        if self._dying or self._dead:
+            self.update_animation(dt)
+            self.rect.midtop = (int(self.pos.x), int(self.pos.y))
+            self.update_hurtbox()
+
+            # still update explosions
+            self.update_explosions(dt)
+            return
 
         self.update_intro(dt)
         if self.state == "intro_done":
@@ -273,37 +313,38 @@ class Boss:
         # -----------------------
         # BOSS AFTERIMAGES
         # -----------------------
-        self.afterimage_timer += dt
+        if not self._dying and not self._dead:
+            self.afterimage_timer += dt
 
-        # --- NORMAL SPEED TRAIL ---
-        if self.speed < 600:
-            if self.afterimage_timer >= 0.175:
-                self.afterimage_timer = 0
+            # --- NORMAL SPEED TRAIL ---
+            if self.speed < 600:
+                if self.afterimage_timer >= 0.175:
+                    self.afterimage_timer = 0
 
-                self.afterimages.append({
-                    "pos": self.pos.copy(),
-                    "frame": self.image.copy(),
-                    "life": 0.35,
-                    "type": "normal"
-                })
+                    self.afterimages.append({
+                        "pos": self.pos.copy(),
+                        "frame": self.image.copy(),
+                        "life": 0.35,
+                        "type": "normal"
+                    })
 
-        # --- HIGH SPEED TRAIL ---
-        else:
-            if self.afterimage_timer >= 0.045:  # MUCH faster spawn
-                self.afterimage_timer = 0
+            # --- HIGH SPEED TRAIL ---
+            else:
+                if self.afterimage_timer >= 0.045:  # MUCH faster spawn
+                    self.afterimage_timer = 0
 
-                self.afterimages.append({
-                    "pos": self.pos.copy(),
-                    "frame": self.image.copy(),
-                    "life": 0.22,  # shorter life = sharper streak feel
-                    "type": "fast"
-                })
+                    self.afterimages.append({
+                        "pos": self.pos.copy(),
+                        "frame": self.image.copy(),
+                        "life": 0.22,  # shorter life = sharper streak feel
+                        "type": "fast"
+                    })
 
-        # Fade & cleanup
-        for img in self.afterimages:
-            img["life"] -= dt
+            # Fade & cleanup
+            for img in self.afterimages:
+                img["life"] -= dt
 
-        self.afterimages = [img for img in self.afterimages if img["life"] > 0]
+            self.afterimages = [img for img in self.afterimages if img["life"] > 0]
 
         for p in self.dash_particles:
             p.update(dt)
@@ -370,6 +411,14 @@ class Boss:
 
         for p in self.dash_particles:
             p.draw(screen, camera_x, camera_y)
+
+        # -----------------------
+        # DRAW MULTI EXPLOSIONS
+        # -----------------------
+        for e in self._explosions:
+            frame = self._ded_frames[e["frame"]]
+            rect = frame.get_rect(center=(int(e["pos"].x), int(e["pos"].y)))
+            screen.blit(frame, rect.move(int(-camera_x), int(-camera_y)))
 
     def update_pattern(self, dt):
         if self.state != "intro_done":
@@ -990,13 +1039,14 @@ class Boss:
 
                 # damage boss (15 per knife × knives in group)
                 self.take_damage(5 * len(group))
+                print("boss took damage")
 
                 return True
 
         return False
     
     def take_damage(self, amount):
-        if self._dead:
+        if self._dead or self._dying:
             return
 
         self.hp -= amount
@@ -1007,14 +1057,56 @@ class Boss:
 
         if self.hp <= 0:
             self.hp = 0
-            self._dead = True
-    
+            self._hit = False
+            self._dying = True
+            self.set_animation("dying", restart=True)
+
+            # FREEZE BOSS
+            self.attack_state = None
+            self.transition_state = None
+            self.state = "dead"
+            self.speed = 0
+
+            # start explosions
+            self._explosion_total_time = self._explosion_duration
+            self._explosions.clear()
+            self.afterimages.clear()
+            self.dash_particles.clear()
+        
     def apply_flash(self, color=(255, 0, 0), alpha=120):
         flash_img = self.image.copy()
         tint = pygame.Surface(self.image.get_size(), pygame.SRCALPHA)
         tint.fill((*color, alpha))
         flash_img.blit(tint, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
         return flash_img
+    
+    def update_explosions(self, dt):
+        if self._explosion_total_time > 0:
+            self._explosion_total_time -= dt
+            self._explosion_timer -= dt
+
+            if self._explosion_timer <= 0:
+                self._explosion_timer = self._explosion_interval
+
+                x = random.randint(self.hurtbox.left, self.hurtbox.right)
+                y = random.randint(self.hurtbox.top, self.hurtbox.bottom)
+
+                self._explosions.append({
+                    "pos": pygame.Vector2(x, y),
+                    "frame": 0,
+                    "timer": 0
+                })
+
+        for e in self._explosions:
+            e["timer"] += dt
+            if e["timer"] >= 0.05:
+                e["timer"] = 0
+                e["frame"] += 1
+
+        self._explosions = [
+            e for e in self._explosions
+            if e["frame"] < len(self._ded_frames)
+        ]
     
 def scale_frames(frames, scale):
     scaled = []
