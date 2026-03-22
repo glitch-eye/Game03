@@ -100,6 +100,7 @@ class Game:
         self.loader.load_animation("player_des", "assets/sprite/player_des")
         # item and effect
         self.loader.load_animation("crystal", "assets/sprite/crystal_sprite")
+        self.loader.load_animation("bomb_effect", "assets/sprite/bomb_effect")
         self.loader.load_animation("big_bomb_effect", "assets/sprite/big_bomb_effect")
         self.loader.load_image("mp_item", "assets/sprite/mpup_sprite/mpup_sprite_0.png")
         self.loader.load_image("hp_item", "assets/sprite/hpup_sprite/hpup_sprite_0.png")
@@ -141,6 +142,8 @@ class Game:
         self.loader.load_animation("marisa_supershot_b", "assets/sprite/marisa_supershot_b")
         self.loader.load_animation("marisa_supershot_c", "assets/sprite/marisa_supershot_c")
         self.loader.load_animation("marisa_supershot_d", "assets/sprite/marisa_supershot_d")
+        self.loader.load_animation("marisa_des", "assets/sprite/marisa_des")
+        self.loader.load_animation("marisa_dying", "assets/sprite/marisa_dying")
         # sounds
 
         # enemies
