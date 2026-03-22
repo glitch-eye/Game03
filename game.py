@@ -431,10 +431,6 @@ class Game:
                 -15  # small padding from top
             ))
 
-                gauge_rect = gauge.get_rect(midtop=(
-                    SCREEN_WIDTH // 2 + OFFSET_X,
-                    -7  # small padding from top
-                ))
 
                 filtered.blit(gauge, gauge_rect)
 
