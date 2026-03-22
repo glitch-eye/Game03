@@ -276,7 +276,7 @@ class Game:
             pos.y = self.player._pos.y
             
             self.collision_map.load_map(self._screen, self.INDEX_MAP, self.map_tiles, pos)
-            self.collision_map.load_collision_map(self._screen, self.collision_tiles, pos)
+            # self.collision_map.load_collision_map(self._screen, self.collision_tiles, pos)
 
             # camera_x = min(max(pos.x - SCREEN_WIDTH // 2, 0), MAP_NUMS[0]*TILE_SIZE - SCREEN_WIDTH)
             # camera_y = min(max(pos.y - SCREEN_HEIGHT // 2, 0), MAP_NUMS[1]*TILE_SIZE - SCREEN_HEIGHT)
@@ -348,14 +348,6 @@ class Game:
             value = int(self.player.time_energy)
             digits = list(str(value))
 
-            hp_crop.blit(hp_bar, (0, 0), (0, 0, hp_width, hp_bar.get_height()))
-            mp_crop.blit(mp_bar, (0, 0), (0, 0, mp_width, mp_bar.get_height()))                      # tweak this
-
-            # draw HP (top)
-            filtered.blit(hp_crop, (base_x, base_y))
-            value = int(self.player.time_energy)
-            digits = list(str(value))
-
             # -----------------------
             # BOSS HP BAR
             # -----------------------
@@ -402,7 +394,8 @@ class Game:
             gauge_rect = gauge.get_rect(midtop=(
             SCREEN_WIDTH // 2 + OFFSET_X,
             -15  # small padding from top
-            ))
+        ))
+
 
             filtered.blit(gauge, gauge_rect)
 

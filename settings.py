@@ -13,7 +13,7 @@ import csv
 os.environ['SDL_VIDEO_CENTERED'] = '1'
 
 TILE_SIZE = 36
-MAP_NUMS = (120, 40)
+MAP_NUMS = (140, 40)
 INDEX_MAP = [[0 for _ in range(MAP_NUMS[0])] for _ in range(MAP_NUMS[1])]
 
 
@@ -28,8 +28,9 @@ GAME_VOLUME = 30
 
 FONT_SIZE = 36
 MENU_FONT = (56, 64)
-PAUSE_RESUME = (320, 340)
-PAUSE_EXIT = (370, 395)
+PAUSE_RESUME = (240, 255)
+PAUSE_EXIT = (280, 295)
+PAUSE_SETTING = (260, 275)
 
 #Colors
 COLOR_WHITE = (255, 255, 255)
