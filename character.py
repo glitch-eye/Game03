@@ -91,13 +91,13 @@ class Character:
             "run_back": loader.get_animation("player_run_back"),
             "crouch": loader.get_animation("player_down"),
             "action1": loader.get_animation("player_action1"),
-            "action2": trim_right(loader.get_animation("player_action2"),32),
-            "action3": trim_right(loader.get_animation("player_action3"),32),
-            "action4": trim_right(loader.get_animation("player_action4"),35),
-            "run_attack1": trim_right(loader.get_animation("player_run_attack1"),0),
-            "run_attack2": trim_right(loader.get_animation("player_run_attack2"),32),
-            "run_attack3": trim_right(loader.get_animation("player_run_attack3"),32),
-            "run_attack4": trim_right(loader.get_animation("player_run_attack4"),32),
+            "action2": loader.get_animation("player_action2"),
+            "action3": loader.get_animation("player_action3"),
+            "action4": loader.get_animation("player_action4"),
+            "run_attack1": loader.get_animation("player_run_attack1"),
+            "run_attack2": loader.get_animation("player_run_attack2"),
+            "run_attack3": loader.get_animation("player_run_attack3"),
+            "run_attack4": loader.get_animation("player_run_attack4"),
             "jump_attack": loader.get_animation("player_jump_attack"),
             "up_shot": loader.get_animation("player_up_shot"),
             "up_shot2": loader.get_animation("player_up_shot2"),
@@ -110,6 +110,14 @@ class Character:
             "player_damage": loader.get_animation("player_damage"),
             "player_fall_down": loader.get_animation("player_fall_down"),
             "player_des": loader.get_animation("player_des"),
+        }
+
+        self.anim_speeds = {
+            "run": 0.04,
+            "idle": 0.08,
+            "jump": 0.08,
+            "fall": 0.08,
+            "glide": 0.08,
         }
 
         # special effects
@@ -126,7 +134,7 @@ class Character:
 
         self.frame_index = 0
         self.frame_timer = 0
-        self.frame_speed = 0.08
+        self.frame_speed = 0.04
 
         self._image = self.frames[0]
 
@@ -144,7 +152,7 @@ class Character:
         self._jumpHeld = False          
 
         # attack
-        self.attack_duration = 0.30
+        self.attack_duration = 0.25
         self.attack_frame_speed = 0.050
         self.upshot_frame_speed = 0.030
         self._attackPressedLastFrame = False
@@ -186,8 +194,23 @@ class Character:
         self.time_stop_toggle_delay = 1.0
 
         self.anim_offsets = {
-            "time_stop": (0, -3),       
-            "time_stop_air": (-10, 0)
+            "time_stop":        {"right": (0, -3),   "left": (0, -3)},
+            "time_stop_air":    {"right": (-10, 0),  "left": (10, 0)},
+
+            # ground combo
+            "action1": {"right": (-5, 0), "left": (5, 0)},
+            "action2": {"right": (13, 0), "left": (-13, 0)},
+            "action3": {"right": (11, 0), "left": (-11, 0)},
+            "action4": {"right": (16, 0), "left": (-16, 0)},
+
+            # running combo
+            "run_attack1": {"right": (0, 0), "left": (0, 0)},
+            "run_attack2": {"right": (22, 0), "left": (-16, 0)},
+            "run_attack3": {"right": (24, 0), "left": (-18, 0)},
+            "run_attack4": {"right": (22, 0), "left": (-16, 0)},
+
+            # air combo
+            "jump_attack": {"right": (-5, 0), "left": (5, 0)},
         }
 
         self.time_energy = 100.0
@@ -280,7 +303,7 @@ class Character:
                 return
             self.pay_attack_cost()            
 
-            if not self._grounded and self._coyoteTimer == 0:
+            if not self._grounded:
                 if self._inputUp:
                     self.start_attack("air_up")
                 elif self._inputDown:
@@ -320,6 +343,14 @@ class Character:
 
             # immediately update the sprite
             self._image = self.frames[self.frame_index]
+
+        # auto-set frame speed by animation
+        if name in self.anim_speeds:
+            self.frame_speed = self.anim_speeds[name]
+        else:
+            self.frame_speed = 0.04  # default speed
+
+        self._image = self.frames[self.frame_index]
 
     # -----------------------
     # UPDATE
@@ -375,6 +406,9 @@ class Character:
         if self.time_stop_startup:
             self.time_stop_startup_timer -= dt
 
+            if self.double_jump_trail_active:
+                self.double_jump_trail_active = False
+
             # lock player completely
             self._vel.x = 0
             self._vel.y = 0
@@ -399,6 +433,8 @@ class Character:
         # time stop ending (cancel animation)
         if self.time_stop_ending:
             self.time_stop_ending_timer -= dt
+            if self.double_jump_trail_active:
+                self.double_jump_trail_active = False
 
             # lock player
             self._vel.x = 0
@@ -441,15 +477,6 @@ class Character:
             if self.time_stop_timer <= 0:
                 self.time_stop = False
                 self.game.time_stop = False
-
-            # advance animation timer
-            self.frame_timer += dt
-            if self.frame_timer >= self.frame_speed:
-                self.frame_timer = 0
-
-                if self.frame_index < len(self.frames) - 1:
-                    self.frame_index += 1
-            self._image = self.frames[self.frame_index]
         
         if not self.time_stop:
             self.time_energy = min(self.time_energy_max, self.time_energy + self.time_regen_rate * dt)
@@ -553,7 +580,7 @@ class Character:
                     "timer": 0,
                     "speed": 0.015,
                     "scale": 0.8,
-                    "x": int(self._pos.x + self._rect.width / 2),
+                    "x": int(self._pos.x),
                     "y": int(self._pos.y + self._rect.height + 4),
                     "rotate": 90
                 }
@@ -638,7 +665,7 @@ class Character:
                     "timer": 0,
                     "speed": 0.015,
                     "scale": scale,
-                    "x": int(self._pos.x + self._rect.width / 2),
+                    "x": int(self._pos.x),
                     "y": int(self._pos.y + self._rect.height),
                 }
 
@@ -845,9 +872,8 @@ class Character:
                         self._attackQueued = False
                         self._attacking = False
                         self._comboIndex = 0
-                        self.frame_speed = 0.07
 
-                        if not self._grounded and self._coyoteTimer <= 0:
+                        if not self._grounded:
                             if self._gliding:
                                 self.set_animation("glide")
                             elif self._vel.y < 0:
@@ -883,16 +909,24 @@ class Character:
 
         # 1. Đồng bộ rect từ vị trí midtop hiện tại
         self._rect.midtop = (int(self._pos.x), int(self._pos.y))
-
+        
         # 2. Lấy vị trí top-left để đưa vào hệ thống va chạm
         collision_pos = pygame.Vector2(self._rect.topleft)
-
         # 3. Gọi hàm va chạm → hàm này sẽ sửa collision_pos và self._vel
-        self._grounded, _ = self.map.update_position(collision_pos, self._rect, self._vel)
+        rect = self._rect
+        if self.player_sliding:
+            collision_pos = pygame.Vector2(collision_pos.x, collision_pos.y + self._rect.height/2)
+            rect = pygame.Rect(collision_pos.x, collision_pos.y, rect.width, self._rect.height/2)
+            print(collision_pos.y)
+            print(self._rect.height/2)
+        self._grounded, _ = self.map.update_position(collision_pos, rect, self._vel)
+        self.map.check_pressing(collision_pos, rect)
+        if self.player_sliding:
+            self._grounded = True
 
         # 4. Cập nhật lại _pos (midtop) từ kết quả top-left đã được điều chỉnh
         self._pos.x = collision_pos.x + self._rect.width / 2
-        self._pos.y = collision_pos.y               # ← điểm midtop.y = top.y (vì midtop)
+        self._pos.y = collision_pos.y if not self.player_sliding else collision_pos.y - self._rect.height / 2         # ← điểm midtop.y = top.y (vì midtop)
 
         # 5. Đồng bộ lại rect từ midtop (để vẽ / camera dùng)
         self._rect.midtop = (int(self._pos.x), int(self._pos.y))
@@ -927,33 +961,39 @@ class Character:
         if self.current_anim in ("up_shot", "up_shot2", "up_shot_air", "up_shot_run"):
             draw_pos = (draw_pos[0], draw_pos[1] - 32)
 
-        offset = self.anim_offsets.get(self.current_anim, (0, 0))
+        offset = self.anim_offsets.get(self.current_anim, (0,0))
 
-        offset_x = offset[0]
-        offset_y = offset[1]
-
-        # flip X offset when facing left
-        if not self._facingRight:
-            offset_x = -offset_x
+        if isinstance(offset, dict):
+            if self._facingRight:
+                offset_x, offset_y = offset["right"]
+            else:
+                offset_x, offset_y = offset["left"]
+        else:
+            offset_x, offset_y = offset
+            if not self._facingRight:
+                offset_x = -offset_x
         
         draw_rect = image.get_rect(midtop=(
             draw_pos[0] + offset_x,
-            draw_pos[1] + offset_y
+            draw_pos[1] + offset_y 
         ))
 
-        camera_x = min(max(draw_rect.x - SCREEN_WIDTH // 2, 0), MAP_NUMS[0]*TILE_SIZE - SCREEN_WIDTH)
-        camera_y = min(max(draw_rect.y - SCREEN_HEIGHT // 2, 0), MAP_NUMS[1]*TILE_SIZE - SCREEN_HEIGHT)
-        x,y = SCREEN_WIDTH//2 , SCREEN_HEIGHT//2
-        if camera_x == 0:
-            x = draw_rect.x
-        if camera_x == MAP_NUMS[0]*TILE_SIZE - SCREEN_WIDTH:
-            x = draw_rect.x%SCREEN_WIDTH
-        if camera_y == 0:
-            y = draw_rect.y
-        if camera_y == MAP_NUMS[1]*TILE_SIZE - SCREEN_HEIGHT:
-            y = draw_rect.y%SCREEN_HEIGHT
-        pygame.draw.rect(screen, (255, 0, 0), (x - draw_rect.width/2, y, draw_rect.width, draw_rect.height))
-        screen.blit(image, pygame.Rect(x - draw_rect.width/2 , y , draw_rect.width, draw_rect.height))
+        map_width  = MAP_NUMS[0] * TILE_SIZE
+        map_height = MAP_NUMS[1] * TILE_SIZE
+
+        camera_x = self._pos.x - SCREEN_WIDTH // 2
+        camera_y = self._pos.y - SCREEN_HEIGHT // 2
+
+        camera_x = max(0, min(camera_x, map_width  - SCREEN_WIDTH))
+        camera_y = max(0, min(camera_y, map_height - SCREEN_HEIGHT))
+        # convert world → screen while preserving anchor
+        screen_rect = draw_rect.move(-camera_x, -camera_y)
+
+        # debug collision box
+        pygame.draw.rect(screen, (255, 0, 0), screen_rect)
+
+        # draw sprite
+        screen.blit(image, screen_rect)
 
         for effect in self.double_jump_effects:
 
@@ -970,7 +1010,10 @@ class Character:
             if "rotate" in effect:
                 frame = pygame.transform.rotate(frame, effect["rotate"])
 
-            rect = frame.get_rect(center=(effect["x"], effect["y"]))
+            rect = frame.get_rect(center=(
+                int(effect["x"] - camera_x),
+                int(effect["y"] - camera_y)
+            ))
             screen.blit(frame, rect)
 
         for effect in self.attack_effects:
@@ -991,12 +1034,13 @@ class Character:
             if not self._facingRight:
                 frame = pygame.transform.flip(frame, True, False)
 
-            direction = 1 if self._facingRight else -1
-
-            x = self._pos.x + self._rect.width // 2 + effect["offset_x"] * direction
+            x = self._pos.x + effect["offset_x"] 
             y = self._pos.y + self._rect.height // 2 + effect["offset_y"]
 
-            rect = frame.get_rect(center=(int(x), int(y)))
+            rect = frame.get_rect(center=(
+                int(x - camera_x),
+                int(y - camera_y)
+            ))
             screen.blit(frame, rect)
 
         # --- time stop wave ---
@@ -1013,8 +1057,8 @@ class Character:
             radius = int(self.time_stop_wave_max_radius * progress)
 
             center = (
-                int(self._pos.x + self._rect.width // 2),
-                int(self._pos.y + self._rect.height // 2)
+                int(self._pos.x - camera_x),
+                int(self._pos.y + self._rect.height // 2 - camera_y)
             )
 
             # slower fade for visibility
@@ -1046,7 +1090,7 @@ class Character:
 
         frames = self.arrow_ring_sprite
 
-        x = self._pos.x + self._rect.width // 2
+        x = self._pos.x
         y = self._pos.y + self._rect.height // 2
 
         rotate = 0
@@ -1055,27 +1099,47 @@ class Character:
 
         # horizontal attacks
         if self.current_anim.startswith(("action", "run_attack")):
-            rotate = 0
-            offset_x = 35
-            offset_y = 2
+            if self._facingRight:
+                rotate = 0
+                offset_x = 35
+                offset_y = 2
+            else:
+                rotate = 0
+                offset_x = -35
+                offset_y = 2
 
         # up shot
         elif self.current_anim in ("up_shot", "up_shot2", "up_shot_run", "up_shot_air"):
-            rotate = -90
-            offset_x = 3
-            offset_y = -40
+            if self._facingRight:
+                rotate = 90
+                offset_x = 3
+                offset_y = -40
+            else:
+                rotate = -90
+                offset_x = -3
+                offset_y = -40
 
         # air downward shot (45°)
         elif self.current_anim == "under_attack":
-            rotate = -45
-            offset_x = 30
-            offset_y = 30
+            if self._facingRight:
+                rotate = -45
+                offset_x = 30
+                offset_y = 30
+            else:
+                rotate = -45
+                offset_x = -30
+                offset_y = 30
 
         # jump attack
         elif self.current_anim == "jump_attack":
-            rotate = 0
-            offset_x = 35
-            offset_y = 2
+            if self._facingRight:
+                rotate = 0
+                offset_x = 35
+                offset_y = 2
+            else:
+                rotate = 0
+                offset_x = -35
+                offset_y = 2
 
         effect = {
             "frames": frames,
@@ -1137,7 +1201,7 @@ class Character:
         self._comboIndex = 0
 
         # reset to a safe animation immediately
-        if not self._grounded and self._coyoteTimer <= 0:
+        if not self._grounded:
             if self._vel.y < 0:
                 self.set_animation("jump", True)
             else:
@@ -1291,7 +1355,6 @@ class Character:
             # when hit ground → switch animation
             if self._grounded:
                 self.set_animation("player_fall_down", True)
-                self.frame_speed = 0.08
 
         # --- FALL DOWN ANIMATION ---
         elif self.current_anim == "player_fall_down":
@@ -1305,7 +1368,7 @@ class Character:
                     # CHECK DEATH HERE
                     if self.hp <= 0:
                         self.set_animation("player_des", True)
-                        self.frame_speed = 0.08
+                        self.frame_speed = 0.04
                         self._takingDamage = False
                         return
                     else:

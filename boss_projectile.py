@@ -1,0 +1,361 @@
+import pygame
+from settings import *
+from utils import *
+import random
+import math
+
+class DashTrail:
+    def __init__(self, pos, frames, facing_right):
+        self.frames = frames
+        self.frame_index = 0
+        self.frame_timer = 0
+        self.frame_speed = 0.05
+
+        self.image = frames[0]
+        self.pos = pygame.Vector2(pos)
+        self.facing_right = facing_right
+
+        self.rect = self.image.get_rect(center=self.pos)
+        self.alive = True
+
+    def update(self, dt):
+        self.frame_timer += dt
+        if self.frame_timer >= self.frame_speed:
+            self.frame_timer = 0
+            self.frame_index += 1
+            if self.frame_index >= len(self.frames):
+                self.alive = False
+                return
+            self.image = self.frames[self.frame_index]
+
+        self.rect.center = self.pos
+
+    def draw(self, screen):
+        img = self.image
+        if not self.facing_right:
+            img = pygame.transform.flip(img, True, False)
+        screen.blit(img, self.rect)
+
+class SmokeColumn:
+    def __init__(self, pos, frames):
+        self.frames = [tint_surface_red(f) for f in frames]
+        self.frame_index = 0
+        self.frame_timer = 0
+        self.frame_speed = 0.11
+
+        self.base_pos = pygame.Vector2(pos)
+
+        # how tall the column is (number of stacked sprites)
+        self.layers = random.randint(5, 5)
+        self.spacing = frames[0].get_height() - 10  # dense overlap
+
+        # Build tall hitbox
+        width = frames[0].get_width()
+        height = self.layers * self.spacing
+        self.rect = pygame.Rect(0, 0, width, height)
+        self.rect.midbottom = self.base_pos
+
+        self.alive = True
+        self.life_timer = 0
+        self.life_duration = 2.0
+
+    def update(self, dt):
+        self.rect.y -= 20 * dt
+
+        self.life_timer += dt
+        if self.life_timer >= self.life_duration:
+            self.alive = False
+            return
+
+        # animate
+        self.frame_timer += dt
+        if self.frame_timer >= self.frame_speed:
+            self.frame_timer = 0
+            self.frame_index = (self.frame_index + 1) % len(self.frames)
+    
+    def draw(self, screen):
+        frame = self.frames[self.frame_index]
+        w = frame.get_width()
+        h = frame.get_height()
+
+        base_x = self.rect.centerx
+        base_y = self.rect.bottom
+
+        overlap = h * 0.45  # strong blending
+
+        for i in range(self.layers):
+            # Fade higher layers slightly
+            alpha = int(255 * (1 - i * 0.18))
+            frame.set_alpha(alpha)
+
+            x = base_x - w // 2
+            y = base_y - h - i * overlap
+
+            screen.blit(frame, (x, y))
+
+class TimeShotProjectile:
+    def __init__(self, pos, facing_right, loader):
+        self.facing_right = facing_right
+
+        self.smoke = loader.get_animation("smoke")
+
+        self.anim = loader.get_animation("marisa_timeshot")
+        self.frame_index = 0
+        self.frame_timer = 0
+        self.frame_speed = 0.08
+
+        self.image = self.anim[0]
+
+        offset = -40 if facing_right else 40
+        self.pos = pygame.Vector2(pos.x + offset, pos.y + 40)
+
+        self.fall_speed = 350
+
+        self.rect = self.image.get_rect(center=self.pos)
+
+        # STANDARDIZED LIFETIME
+        self.alive = True
+
+    def update(self, dt, player_rect, particle_list):
+        # Fall
+        self.pos.y += self.fall_speed * dt
+
+        # Remove when offscreen
+        if self.pos.y > SCREEN_HEIGHT:
+            self.alive = False
+
+            explosion_pos = pygame.Vector2(self.rect.midbottom)
+
+            particle_list.append(
+                SmokeColumn(explosion_pos, self.smoke)
+            )
+            return
+
+        # Animate
+        self.frame_timer += dt
+        if self.frame_timer >= self.frame_speed:
+            self.frame_timer = 0
+            self.frame_index = (self.frame_index + 1) % len(self.anim)
+            self.image = self.anim[self.frame_index]
+
+        self.rect.center = self.pos
+
+    def draw(self, screen):
+        img = self.image
+        if not self.facing_right:
+            img = pygame.transform.flip(img, True, False)
+        screen.blit(img, self.rect)
+
+
+class UndershotProjectile:
+    def __init__(self, x, y, proj_frames, laser_frames):
+        self.proj_frames = proj_frames
+        self.laser_frames = laser_frames
+        self.frames = proj_frames
+
+        self.frame_index = 0
+        self.frame_timer = 0
+        self.frame_speed = 0.08
+
+        self.image = self.frames[0]
+        self.rect = self.image.get_rect(center=(x, y))
+
+        self.vel = pygame.Vector2(0, 480)
+
+        self.state = "projectile"
+        self.alive = True
+
+        # TRUE physics ground
+        self.ground_y = SCREEN_HEIGHT
+
+    def update(self, dt, player_rect=None, particle_list=None):
+
+        # -----------------------
+        # PROJECTILE FALL
+        # -----------------------
+        if self.state == "projectile":
+            self.rect.centery += self.vel.y * dt
+
+            # Wait until it ACTUALLY touches ground
+            if self.rect.bottom >= self.ground_y:
+                self.rect.bottom = self.ground_y
+                self._become_laser()
+
+        # -----------------------
+        # ANIMATION
+        # -----------------------
+        self.frame_timer += dt
+        if self.frame_timer >= self.frame_speed:
+            self.frame_timer = 0
+            self.frame_index += 1
+
+            if self.frame_index >= len(self.frames):
+                if self.state == "laser":
+                    self.alive = False
+                    return
+                else:
+                    self.frame_index = 0
+
+            self.image = self.frames[self.frame_index]
+
+    def _become_laser(self):
+        self.state = "laser"
+        self.frames = self.laser_frames
+        self.frame_index = 0
+        self.frame_timer = 0
+        self.vel = pygame.Vector2(0, 0)
+
+        # Scale every laser frame to screen height
+        scaled_frames = []
+        for frame in self.frames:
+            w = frame.get_width()
+            scaled = pygame.transform.scale(frame, (w, SCREEN_HEIGHT))
+            scaled_frames.append(scaled)
+
+        self.frames = scaled_frames
+        self.image = self.frames[0]
+
+        # Anchor to bottom center of screen
+        self.rect = self.image.get_rect(
+            midbottom=(self.rect.centerx, SCREEN_HEIGHT)
+        )
+
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)
+
+class ShotProjectile:
+    def __init__(self, start, first_target, frames, facing_right, trail_big, trail_small):
+        self.frames = frames
+        self.frame_index = 0
+        self.frame_timer = 0
+        self.frame_speed = 0.08
+
+        self.image = self.frames[0]
+        self.pos = pygame.Vector2(start)
+        self.rect = self.image.get_rect(center=self.pos)
+
+        # Direction
+        self.facing_right = facing_right
+
+        # Trail visuals
+        self.trail_big = trail_big
+        self.trail_small = trail_small
+        self.trail_timer = 0
+
+        # --- Homing phases ---
+        self.phase = 1
+        self.phase_timer = 0
+
+        self.target = pygame.Vector2(first_target)
+
+        self.speed_phase1 = 200
+        self.speed_phase2 = 500
+
+        self.fly_time = 0
+        self.max_fly_time = 0.35
+
+        direction = (self.target - self.pos)
+        if direction.length() != 0:
+            direction = direction.normalize()
+        self.velocity = direction * self.speed_phase1
+
+        self.alive = True
+
+    def update(self, dt, player_rect, particle_list):
+        self.phase_timer += dt
+
+        # -----------------------
+        # PHASE 1 — Slow tracking
+        # -----------------------
+        if self.phase == 1:
+            self.pos += self.velocity * dt
+
+            if self.phase_timer >= 0.3:
+                self.phase = 2
+                self.phase_timer = 0
+                self.velocity = pygame.Vector2(0, 0)
+                self.target = pygame.Vector2(player_rect.center)
+
+        # -----------------------
+        # PHASE 2 — Aggressive dash
+        # -----------------------
+        elif self.phase == 2:
+            to_target = self.target - self.pos
+            distance = to_target.length()
+
+            if distance > 8:
+                direction = to_target.normalize()
+                self.velocity = direction * self.speed_phase2
+                self.pos += self.velocity * dt
+            else:
+                # Instead of dying, enter fly-through phase
+                self.phase = 3
+                self.fly_time = 0
+
+        # -----------------------
+        # PHASE 3 — Fly-through
+        # -----------------------
+        elif self.phase == 3:
+            self.fly_time += dt
+            self.pos += self.velocity * dt
+
+            # Hit ground
+            if self.pos.y >= SCREEN_HEIGHT - 10:
+                self.alive = False
+                return
+
+            # Timeout
+            if self.fly_time >= self.max_fly_time:
+                self.alive = False
+                return
+
+        # -----------------------
+        # DUAL TRAIL EFFECTS
+        # -----------------------
+        self.trail_timer += dt
+
+        # SMALL trail — frequent
+        if self.trail_timer >= 0.035:
+            x_jitter = random.randint(-10, 10)
+            y_jitter = random.randint(-6, 14)
+            back_offset = -12 if self.facing_right else 12
+
+            spawn_pos = pygame.Vector2(
+                self.pos.x + back_offset + x_jitter,
+                self.pos.y + y_jitter
+            )
+
+            particle_list.append(
+                DashTrail(spawn_pos, self.trail_small, self.facing_right)
+            )
+
+        # BIG trail — less frequent
+        if self.trail_timer >= 0.09:
+            self.trail_timer = 0  # reset only after big trail
+
+            x_jitter = random.randint(-6, 6)
+            y_jitter = random.randint(-4, 10)
+            back_offset = -10 if self.facing_right else 10
+
+            spawn_pos = pygame.Vector2(
+                self.pos.x + back_offset + x_jitter,
+                self.pos.y + y_jitter
+            )
+
+            particle_list.append(
+                DashTrail(spawn_pos, self.trail_big, self.facing_right)
+            )
+
+        self.rect.center = self.pos
+
+        # -----------------------
+        # ANIMATION
+        # -----------------------
+        self.frame_timer += dt
+        if self.frame_timer >= self.frame_speed:
+            self.frame_timer = 0
+            self.frame_index = (self.frame_index + 1) % len(self.frames)
+            self.image = self.frames[self.frame_index]
+
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)

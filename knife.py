@@ -13,7 +13,7 @@ class Knife:
 
         self.direction = direction
         self.vel = pygame.Vector2(300 * direction, 0)
-        speed = 300
+        speed = 600
 
         if attack_type == "under_attack":
             # 45° downward

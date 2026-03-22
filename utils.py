@@ -58,3 +58,18 @@ def apply_grayscale(surface):
     arr[:,:,2] = gray
 
     return pygame.surfarray.make_surface(arr)
+
+def recolor_red(surface):
+    surf = surface.copy().convert_alpha()
+
+    # Zero out green & blue, keep red channel
+    tint = pygame.Surface(surf.get_size()).convert_alpha()
+    tint.fill((255, 0, 0, 255))  # bright red tint
+
+    surf.blit(tint, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+    return surf
+
+def tint_surface_red(surface):
+    tinted = surface.copy()
+    tinted.fill((255, 60, 60, 180), special_flags=pygame.BLEND_RGBA_MULT)
+    return tinted
