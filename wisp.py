@@ -4,22 +4,23 @@ import random
 from pygame.locals import *
 from settings import *
 
-def update_entity_pos(camera_pos, entity):
+def update_entity_pos(camera_pos, entity_rect):
     """
     Scale entity position from world coordinates to camera coordinates.
-    Updates entity._pos so it can be drawn correctly on screen.
+    Updates entity._pos so it can be drawn correctly on screen. 
+    returning pos will be topleft
     """
     # Tính vị trí camera trong thế giới (world coordinates)
     camera_x = min(max(camera_pos.x - SCREEN_WIDTH // 2, 0), MAP_NUMS[0]*TILE_SIZE - SCREEN_WIDTH)
     camera_y = min(max(camera_pos.y - SCREEN_HEIGHT // 2, 0), MAP_NUMS[1]*TILE_SIZE - SCREEN_HEIGHT)
 
-    cur_pos = entity._rect.topleft
+    cur_pos = entity_rect.topleft
 
     # check if it appears in camera (using rect overlapping check)
     overlap = False
     draw_pos = None
-    if (entity._rect.left <= camera_x + SCREEN_WIDTH and entity._rect.right >= camera_x
-        and entity._rect.top <= camera_y + SCREEN_HEIGHT and entity._rect.bottom >= camera_y):
+    if (entity_rect.left <= camera_x + SCREEN_WIDTH and entity_rect.right >= camera_x
+        and entity_rect.top <= camera_y + SCREEN_HEIGHT and entity_rect.bottom >= camera_y):
         overlap = True
         # calculate position relative to camera
         draw_pos = (cur_pos[0] - camera_x, cur_pos[1] - camera_y)
@@ -27,10 +28,10 @@ def update_entity_pos(camera_pos, entity):
     return overlap, draw_pos
 class Wisp:
 
-    def __init__(self, x, y, loader):
+    def __init__(self, data, loader):
 
         # position
-        self._pos = pygame.Vector2(x, y)
+        self._pos = pygame.Vector2(data[0], data[1])
         self._speed = 50
 
         # animation
@@ -40,7 +41,6 @@ class Wisp:
         self._frame_index = 0
         self._anim_speed = 8
         self._anim_timer = 0
-        self.spawn_freeze_timer = 10.0 # freeze for 10 seconds after spawn
 
         self._image = self._frames[0]
         self._rect = self._image.get_rect(center=self._pos)
@@ -50,15 +50,13 @@ class Wisp:
 
         self._died = False
         self._alive = True
+        self._radius = SCREEN_WIDTH * GAME_SCALE
 
     # -----------------------
     # UPDATE
     # -----------------------
 
-    def update(self, dt, player_pos, knives):
-        if self.spawn_freeze_timer > 0:
-            self.spawn_freeze_timer -= dt
-            return
+    def update(self, dt, player, knives):
         
         if self._alive:
             if self.is_hit(knives):
@@ -70,11 +68,19 @@ class Wisp:
 
         if self._alive:
             # direction to player
-            direction = pygame.Vector2(player_pos) - self._pos + (16,32)
+            direction = pygame.Vector2(player._pos) - self._pos + (16,32)
             distance = direction.length()
 
             if distance > 0:
                 direction = direction.normalize()
+
+            if distance > self._radius:
+                # out of range
+                return
+            
+            #check attacking
+            if self.did_hit(player._rect):
+                player.take_damage(self._pos.x)
 
             # move toward player
             self._pos += direction * self._speed * dt
@@ -100,14 +106,15 @@ class Wisp:
             else:
                 self._image = self._frames[self._frame_index]
 
-
     # -----------------------
     # DRAW
     # -----------------------
 
-    def draw(self, screen):
-        if not self._died:
-            screen.blit(self._image, self._rect)
+    def draw(self, screen, camera_pos):
+        is_draw, draw_pos = update_entity_pos(camera_pos, self._rect)
+        if not self._died and is_draw:
+            rect = self._image.get_rect(center=draw_pos)
+            screen.blit(self._image, rect)
 
     # -----------------------
     # COLLISION (for later)
@@ -115,6 +122,14 @@ class Wisp:
 
     def get_rect(self):
         return self._rect
+    
+    #------------------------------
+    #    ENEMY ATTACK
+    #------------------------------
+    def did_hit(self, player_rect):
+        if self._rect.colliderect(player_rect):
+            return True
+        return False
     
     #------------------------------
     #    ENEMY HIT DETECTION
@@ -138,7 +153,7 @@ class Wisp:
         return False
     
 class Goblin:
-    def __init__(self, x, y, loader):
+    def __init__(self, loader, data):
         self._animations = {
             "idle": loader.get_animation("goblin_idle"),
             "attack": loader.get_animation("goblin_attack"),
@@ -147,7 +162,7 @@ class Goblin:
         }
 
         # position
-        self._pos = pygame.Vector2(x, y)
+        self._pos = pygame.Vector2(data[0], data[2])
         self._vel = pygame.Vector2(0, 0)
 
         # animation
@@ -169,12 +184,22 @@ class Goblin:
         self._sight_angle = GOB_SIGHT_ANGLE #in degree
         self._health = GOB_HEALTH
         self._died = False
+        self._show_hitbox = True
+        self.hitbox = pygame.Rect(0, 0, 0, self._hit_height)
 
         # take damage logic
         self._shake_timer = 0
         self._shake_strength = 4 
         self._shake_duration = 8
         self._hit = False
+
+        #moving range
+        self.start = min(data[0], data[1])
+        self.end = max(data[0], data[1])
+        if self.start == self._pos.x:
+            self._dir = "right"
+        else:
+            self._dir = "left"
 
     #----------------------
     #    UPDATE     !!!! KNIFE DAMAGE MAGIC NUMBER !!!!!
@@ -184,7 +209,7 @@ class Goblin:
         player_rect = player._rect
         # check hit player if attacking (hit box increase from frame 15 - 21 and then reduce)
         if self._attack:
-            if self.did_hit(player_rect):
+            if self.did_hit(player):
                 player.take_damage(self._pos.x)
 
         #hit check
@@ -215,6 +240,7 @@ class Goblin:
                 else:
                     # if not in range then tryna follow la
                     if self._attack and self._frame_index == len(self._frames) - 1:
+                        # done attack and no more in range then follow
                         self._vel.x = (direction.x / abs(direction.x)) * 30
                         self._dir = "right" if self._vel.x > 0 else "left"
                         self._attack = False
@@ -224,9 +250,20 @@ class Goblin:
                         self._anim_timer = 0
                         self._anim_speed = 8
                         self._image = self._frames[0]
+                    elif not self._attack:
+                        # move
+                        self._vel.x = (direction.x / abs(direction.x)) * 30
+                        self._vel.x = 30 if self._dir == "right" else -30
+                        if self._frame_index != 0: # continue the movement if not idling
+                            self._frame_index = 0
+                            self._frames = self._animations["run"]
+                            self._anim_timer = 0
+                            self._anim_speed = 8
+                            self._image = self._frames[0]
             else:
                 # no seeing then return to normal once the attack animation is done
                 if self._attack and self._frame_index == len(self._frames) - 1:
+                    self.hitbox.width = 0
                     self._attack = False
                     self._vel.x = 30 if self._dir == "right" else -30
                     self._frame_index = 0
@@ -266,15 +303,20 @@ class Goblin:
     #    DRAW FUNCTION
     #----------------------
     def draw(self, screen, camera_pos):
-        is_draw, draw_pos = update_entity_pos(camera_pos, self)
+        is_draw, draw_pos = update_entity_pos(camera_pos, self._rect)
         if self._died or not is_draw:
             return
         offset_x = 0
+        _, hitbox_draw = update_entity_pos(camera_pos, self.hitbox)
         draw_image = self._image
         if self._hit:
             offset_x = int(math.sin(self._shake_timer * 20) * self._shake_strength)
             draw_image = self.apply_flash()
         drawpos = (draw_pos[0] + offset_x, draw_pos[1])
+        if self._show_hitbox and self._attack and hitbox_draw is not None:
+            screen_hitbox = self.hitbox.copy()
+            screen_hitbox.topleft = hitbox_draw
+            pygame.draw.rect(screen, rect=screen_hitbox, color=COLOR_GREEN)
         if self._dir == "left":
             if not self._attack:
                 screen.blit(draw_image, drawpos)
@@ -294,19 +336,15 @@ class Goblin:
     #----------------------
     #    COLLISION
     #----------------------
-    def check_collision(self, collision_map):
-        collision_pos = self._pos
-        is_ground, _ = collision_map.update_position(collision_pos, self._rect, self._vel)
-        
-        # self._pos.x = collision_pos.x + self._rect.width / 2
-        self._pos.y = collision_pos.y               # ← điểm midtop.y = top.y (vì midtop)
-
-        # 5. Đồng bộ lại rect từ midtop (để vẽ / camera dùng)
-        self._rect.midtop = (int(self._pos.x), int(self._pos.y))
-        if is_ground and self._vel.y > 0:
-            self._vel.y = 0
-        elif not is_ground:
-            self._vel.y = GAME_GRAVITY
+    def check_collision(self):
+        if self._pos.x >= self.end:
+            self._pos.x = self.end
+            self._vel.x = -self._vel.x
+            self._dir = "left"
+        elif self._pos.x <= self.start:
+            self._pos.x = self.start
+            self._vel.x = -self._vel.x
+            self._dir = "right"
 
     #------------------------------
     #    ENEMY EYE SIGHT LOGIC
@@ -336,30 +374,30 @@ class Goblin:
     #------------------------------
     #    ENEMY HIT PLAYER
     #------------------------------
-    def did_hit(self, player_rect):
-        player_hurtbox = pygame.Rect(0, 0, PLAYER_HURTBOX_WIDTH, PLAYER_HURTBOX_HEIGHT)
-        player_hurtbox.center = player_rect.center
+    def did_hit(self, player):
+        player_hurtbox = pygame.Rect(0, 0, PLAYER_COLLISION_WIDTH, PLAYER_COLLISION_HEIGHT)
+        player_hurtbox.midtop = player._pos
         if 15 <= self._frame_index <= 21:
             # hitbox size increasing horizontaly
             progress = (self._frame_index - 15) / (21 - 15)
             hitbox_length = self._hit_range * progress
-            hitbox_left = self._pos.x - GOB_TRIM_ATTACK_LEFT if self._dir == "left" else self._pos.x - GOB_TRIM_ATTACK_RIGHT
-            hitbox_top = self._rect.y / 2
+            hitbox_left = self._rect.centerx if self._dir == "right" else self._rect.centerx- hitbox_length
+            hitbox_top = self._rect.centery - self._hit_height // 2
+            self.hitbox.topleft = (hitbox_left, hitbox_top)
+            self.hitbox.width = hitbox_length
             
-            # check for collision (current use player._rect)
-            if (hitbox_left <= player_hurtbox.left and hitbox_left + hitbox_length >= player_hurtbox.right
-                and hitbox_top <= player_hurtbox.top and hitbox_top + self._hit_height >= player_hurtbox.bottom):
+            if self.hitbox.colliderect(player_hurtbox):
                 return True
         elif 22 <= self._frame_index <= 25:
             # hibox size decreasing
             progress = (self._frame_index - 25) / (22 - 25)
             hitbox_length = self._hit_range * progress
-            hitbox_left = self._pos.x - GOB_TRIM_ATTACK_LEFT if self._dir == "left" else self._pos.x - GOB_TRIM_ATTACK_RIGHT
-            hitbox_top = self._rect.y / 2
+            hitbox_left = self._rect.centerx if self._dir == "right" else self._rect.centerx - hitbox_length
+            hitbox_top = self._rect.centery - self._hit_height // 2
+            self.hitbox.topleft = (hitbox_left, hitbox_top)
+            self.hitbox.width = hitbox_length
             
-            # check for collision (current use player._rect)
-            if (hitbox_left <= player_hurtbox.left and hitbox_left + hitbox_length >= player_hurtbox.right
-                and hitbox_top <= player_hurtbox.top and hitbox_top + self._hit_height >= player_hurtbox.bottom):
+            if self.hitbox.colliderect(player_hurtbox):
                 return True
         else:
             return False
@@ -458,7 +496,7 @@ class Crystal:
         self._health = 100
 
         self._image = self._frame[0]
-        self._pos = pygame.Vector2(150, 150)
+        self._pos = pygame.Vector2(CRYSTAL_POS[0])
         self._rect = self._image.get_rect(center=self._pos)
         self._died = False
 
@@ -515,18 +553,20 @@ class Crystal:
 
         return flash_img
 
-    def draw(self, screen):
-        if not self._died:
-            offset_x = 0
-            draw_image = self._image
-            if self._hit and self._alive:
-                offset_x = int(math.sin(self._shake_timer * 20) * self._shake_strength)
-                draw_image = self.apply_flash()
+    def draw(self, screen, camera_pos):
+        is_draw, draw_pos = update_entity_pos(camera_pos, self._rect)
+        if is_draw:
+            if not self._died:
+                offset_x = 0
+                draw_image = self._image
+                if self._hit and self._alive:
+                    offset_x = int(math.sin(self._shake_timer * 20) * self._shake_strength)
+                    draw_image = self.apply_flash()
 
-            draw_pos = (self._rect.centerx + offset_x, self._rect.centery)
-            rect = draw_image.get_rect(center=draw_pos)
-            screen.blit(draw_image, rect)
-        self._item.draw(screen)
+                draw_pos = (draw_pos[0] + offset_x, draw_pos[1])
+                rect = draw_image.get_rect(center=draw_pos)
+                screen.blit(draw_image, rect)
+            self._item.draw(screen)
 
     def is_hit(self, knives):
         # accumulate the hitbox of every 3 knives to one
