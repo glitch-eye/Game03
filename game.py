@@ -157,9 +157,9 @@ class Game:
         self.enemy_projectiles = []
         self.enemy_particles = []
         # music
-        # self.loader.load_music("Luna_Dial", "assets/music/Lunar Clock Lunar Dial.ogg")
-        # music_path = self.loader.get_music("Luna_Dial")
-        # pygame.mixer.music.load(music_path)
+        self.loader.load_music("Luna_Dial", "assets/music/Lunar Clock Lunar Dial.ogg")
+        music_path = self.loader.get_music("Luna_Dial")
+        pygame.mixer.music.load(music_path)
 
         # loading screen loop
         while not self.loader.done():
@@ -181,7 +181,8 @@ class Game:
         self.loader.finalize()
 
         # start music
-        # pygame.mixer.music.play(-1)   # -1 = loop forever
+        pygame.mixer.music.set_volume(GAME_VOLUME / 100)
+        pygame.mixer.music.play(-1)   # -1 = loop forever
         self.menu = Menu(loader=self.loader)
         # retrieve animation frames
         self.wisp = list(self.executor.map(lambda x: Wisp(x, self.loader), WISP_POS))
@@ -246,6 +247,7 @@ class Game:
             self._display = pygame.display.set_mode(
                 (SCREEN_WIDTH * GAME_SCALE, SCREEN_HEIGHT * GAME_SCALE)
             )
+        pygame.mixer.music.set_volume(self.menu.setting_options["VOLUME"] / 100)
         self.collision_map.update_position(pos, pygame.Rect(0,0,40,40), pygame.Vector2(10,10))
         self.player.update(dt)
 
