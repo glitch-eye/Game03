@@ -269,7 +269,7 @@ class Map:
             elif tile_type == 1 or tile_type == 18:
                 target_y = row * TILE_SIZE
             elif tile_type == 16:
-                target_y = row * TILE_SIZE + 0.5
+                target_y = row * TILE_SIZE + 0.5 * TILE_SIZE
             elif tile_type == 25:
                 target_y = row * TILE_SIZE if rel_x >= 0.5 else (row + 1)*TILE_SIZE
             elif tile_type == 26:
@@ -462,9 +462,9 @@ class Map:
                         elif tile_type == 1 or tile_type == 18:
                             target_y = check_row * TILE_SIZE
                         elif tile_type == 16:
-                            target_y = check_row * TILE_SIZE + 0.5
+                            target_y = check_row * TILE_SIZE + 0.5 * TILE_SIZE
                         
-                        if target_y is not None and foot_y > target_y and foot_y - target_y <= TILE_SIZE:
+                        if target_y is not None and foot_y > target_y and foot_y - target_y <= TILE_SIZE * 5:
                             position.y = target_y - rect.height
                             vel.y = 0
                             is_ground = True

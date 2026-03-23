@@ -110,14 +110,14 @@ class SmokeColumn:
         self.hitbox = self.rect.copy()
 
         if self.hitbox and self.hitbox.colliderect(player.get_hurtbox_rect()):
-            player.time_energy -= 8 * dt
+            player.time_energy -= 30 * dt
             player._inSmoke = True
 
     def timestop_update(self, dt, player):
         self.hitbox = self.rect.copy()
 
         if self.hitbox and self.hitbox.colliderect(player.get_hurtbox_rect()):
-            player.time_energy -= 8 * dt
+            player.time_energy -= 30 * dt
             player._inSmoke = True
     
     def draw(self, screen, camera_x, camera_y):
@@ -279,11 +279,11 @@ class UndershotProjectile:
         if self.state == "laser":
             self.hitbox = get_tight_hitbox(self.image, self.rect, "midbottom")
             if self.hitbox.colliderect(player.get_hurtbox_rect()):
-                player.apply_damage(20, self.hitbox.centerx)
+                player.apply_damage(10, self.hitbox.centerx)
         else:
             self.hitbox = get_tight_hitbox(self.image, self.rect, "center")
             if self.hitbox.colliderect(player.get_hurtbox_rect()):
-                player.apply_damage(10, self.hitbox.centerx)
+                player.apply_damage(20, self.hitbox.centerx)
 
 
     def _become_laser(self):
@@ -308,6 +308,16 @@ class UndershotProjectile:
             midbottom=(self.rect.centerx, BOSS_ARENA.bottom + 70)
         )
         self.hitbox = get_tight_hitbox(self.image, self.rect, "midbottom")
+
+    def timestop_update(self, dt, player):
+        if self.state == "laser":
+            self.hitbox = get_tight_hitbox(self.image, self.rect, "midbottom")
+            if self.hitbox.colliderect(player.get_hurtbox_rect()):
+                player.apply_damage(20, self.hitbox.centerx)
+        else:
+            self.hitbox = get_tight_hitbox(self.image, self.rect, "center")
+            if self.hitbox.colliderect(player.get_hurtbox_rect()):
+                player.apply_damage(10, self.hitbox.centerx)
 
     def draw(self, screen, camera_x, camera_y):
         screen.blit(self.image, self.rect.move(int(-camera_x), int(-camera_y)))
@@ -475,6 +485,11 @@ class ShotProjectile:
             self.image = self.frames[self.frame_index]
 
         self.hitbox = get_tight_hitbox(self.image, self.rect, "center")
+        if self.hitbox.colliderect(player.get_hurtbox_rect()):
+            player.apply_damage(15, self.hitbox.centerx)
+            self.alive = False
+
+    def timestop_update(self, dt, player):
         if self.hitbox.colliderect(player.get_hurtbox_rect()):
             player.apply_damage(15, self.hitbox.centerx)
             self.alive = False

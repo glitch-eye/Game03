@@ -4,7 +4,7 @@ from utils import *
 from wisp import *
 from menu import *
 from boss import Boss
-from boss_projectile import SmokeColumn
+from boss_projectile import *
 from fire_gate import *
 from asset_loader import AssetLoader
 import pygame
@@ -303,6 +303,7 @@ class Game:
             self.knives = [k for k in self.knives if k.alive]
         else:
             [p.timestop_update(dt, self.player) for p in self.enemy_particles if isinstance(p, SmokeColumn)]
+            [proj.timestop_update(dt, self.player) for proj in self.enemy_projectiles if isinstance(proj, UndershotProjectile) or isinstance(proj, ShotProjectile)]
 
     # -----------------------
     # COLLISION

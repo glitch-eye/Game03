@@ -141,7 +141,7 @@ class Boss:
         self.speed = 0
 
         # HP
-        self.hp = 1500
+        self.hp = 750
         self.max_hp = 1500
         self._dead = False
         # hurt flash system
@@ -151,6 +151,7 @@ class Boss:
         # dead
         self._dying = False 
         self._dead_anim_done = False
+        # MASTER SPARKSSSSSSSSSSSSS
 
     def arena_left(self):  return self.arena.left
     def arena_right(self): return self.arena.right
@@ -288,8 +289,10 @@ class Boss:
         self.update_intro(dt)
         if self.state == "intro_done":
             self.update_pattern(dt)
-        elif self.state == "post_dash_recover":
+        elif self.state == "post_dash_recover" and self.hp > (self.max_hp/2):
             self.update_post_dash_recover(dt)
+        elif self.state == "post_dash_recover":
+            self.update_master_spark(dt)
         self.update_animation(dt)
         self.rect.midtop = (int(self.pos.x), int(self.pos.y))
         self.update_hurtbox()
@@ -974,6 +977,145 @@ class Boss:
 
         # -----------------------
         # PHASE 5 — DESCEND TO LOW HEIGHT
+        # -----------------------
+        elif self.attack_state == "descend":
+
+            low_y = self.height_levels["low"]
+
+            if abs(self.pos.y - low_y) > 3:
+                self.pos.y += 325 * dt
+            else:
+                self.pos.y = low_y
+
+            if self.pos.y > low_y:
+                self.pos.y = low_y
+
+            if self.frame_index >= len(self.frames) - 1:
+                # Sit idle
+                self.set_animation("sit")
+                self.attack_state = None
+
+                # Flip attack directions only
+                self.pattern_loop_flipped = not self.pattern_loop_flipped
+
+                # Restart pattern from beginning
+                self.pattern_index = 0
+                self.attack_state = None
+                self.transition_state = None
+
+                self.state = "intro_done"
+
+    def update_master_spark(self, dt):
+
+        player_x = self.player_pos.x
+
+        # -----------------------
+        # PHASE 1 — FLY IN (STOP ANIM)
+        # -----------------------
+        if self.attack_state is None:
+            self.attack_state = "fly_in"
+            self.visible = True
+            self.set_animation("stop")
+
+            cam_left  = self.game.camera_x
+            cam_right = self.game.camera_x + SCREEN_WIDTH
+
+            margin = 80          # MUCH closer
+            top_y = cam_left  # temp placeholder to keep structure
+            top_y = -120
+
+            if self.real_dash_dir < 0:  # exited left
+                self.pos.x = cam_left - margin
+                self.facing_right = True
+            else:                       # exited right
+                self.pos.x = cam_right + margin
+                self.facing_right = False
+
+            self.pos.y = top_y
+
+        elif self.attack_state == "fly_in":
+
+            side = -1 if self.pattern_loop_flipped else 1
+            target_x = player_x + 225 * side
+            target_y = self.height_levels["high"]
+
+            dx = target_x - self.pos.x
+            dy = target_y - self.pos.y
+            dist = math.hypot(dx, dy)
+
+            if dist > 5:
+                speed = 600
+                self.pos.x += dx / dist * speed * dt
+                self.pos.y += dy / dist * speed * dt
+            else:
+                self.attack_state = "turn1"
+                self.set_animation("standing_turn")
+
+        # -----------------------
+        # PHASE 2 — TURN TOWARD PLAYER AND PREPARE SHOT
+        # -----------------------
+        elif self.attack_state == "turn1":
+            if self.frame_index >= len(self.frames) - 1:
+                self.facing_right = not self.facing_right
+                self.set_animation("undershot")
+                self.attack_state = "prepare_spark"
+
+        # -----------------------
+        # PHASE 3 - PREPARE TO FIRE
+        # -----------------------
+        elif self.attack_state == "prepare_spark":
+            if self.frame_index >= len(self.frames) - 1:
+                self.set_animation("supershot")
+                self.attack_state = "master_spark"
+
+        # -----------------------
+        # PHASE 4 — FIRE AND MOVE ACROSS UNTIL COVER 500 PIXELS
+        # -----------------------
+        elif self.attack_state == "master_spark":
+            
+            if not hasattr(self, "spark_start_x"):
+                self.spark_start_x = self.pos.x
+                self.spark_dir = 1 if self.facing_right else -1
+
+            # Move in locked direction
+            speed = 600  # pixels per second
+            self.pos.x += self.spark_dir * speed * dt
+
+            # Check distance traveled
+            if abs(self.pos.x - self.spark_start_x) >= 600:
+                del self.spark_start_x
+                del self.spark_dir
+
+                self.attack_state = "recovery"
+                self.set_animation("undershot")
+
+        # -----------------------
+        # PHASE 5 — RECOVERY
+        # -----------------------
+        elif self.attack_state == "recovery":
+            if self.frame_index >= len(self.frames) - 1:
+                self.set_animation("stand")
+                self.attack_state = "stand_up"
+
+        # -----------------------
+        # PHASE 6 — BACK TO STAND
+        # -----------------------
+        elif self.attack_state == "stand_up":
+            if self.frame_index >= len(self.frames) - 1:
+                self.set_animation("standing_turn")
+                self.attack_state = "turn2"      
+
+        # -----------------------
+        # PHASE 7 — TURN AROUND
+        # -----------------------
+        elif self.attack_state == "turn2":
+            if self.frame_index >= len(self.frames) - 1:
+                self.facing_right = not self.facing_right
+                self.set_animation("sit_down")
+                self.attack_state = "descend" 
+
+        # -----------------------
+        # PHASE 8 — SIT DOWN AND DESCEND TO LOW HEIGHT
         # -----------------------
         elif self.attack_state == "descend":
 
