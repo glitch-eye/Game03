@@ -201,6 +201,7 @@ class Goblin:
         self._shake_strength = 4 
         self._shake_duration = 8
         self._hit = False
+        self._hurtbox = pygame.Rect(0, 0, GOB_WIDTH, GOB_HEIGHT)
 
         #moving range
         self.start = min(data[0], data[1])
@@ -215,6 +216,7 @@ class Goblin:
     #----------------------
     def update(self, dt, player, knives):
         """Update animation, position based on dt, attack if player_pos in range"""
+        self.update_hurtbox()
         #hit check
         if self._health > 0:
             if self.is_hit(knives):
@@ -306,6 +308,34 @@ class Goblin:
 
         self._rect.topleft = self._pos
 
+    def update_hurtbox(self):
+        mask = pygame.mask.from_surface(self._image)
+        rects = mask.get_bounding_rects()
+
+        if rects:
+            largest = max(rects, key=lambda r: r.width * r.height)
+
+            if not hasattr(self, "_hurtbox"):
+                # initialize once
+                self._hurtbox = pygame.Rect(
+                    self._rect.left + largest.left,
+                    self._rect.top + largest.top,
+                    largest.width,
+                    largest.height
+                )
+            else:
+                # update existing rect in place
+                self._hurtbox.update(
+                    self._rect.left + largest.left,
+                    self._rect.top + largest.top,
+                    largest.width,
+                    largest.height
+                )
+        else:
+            if not hasattr(self, "_hurtbox"):
+                self._hurtbox = self._rect.copy()
+            else:
+                self._hurtbox.update(self._rect)
 
     #----------------------
     #    DRAW FUNCTION
@@ -446,8 +476,8 @@ class Goblin:
                 rect_right = max(x.rect.right for x in group)
                 rect_bottom = max(x.rect.bottom for x in group)
 
-                if (rect_left <= self._rect.right and rect_right >= self._rect.left
-                    and rect_top <= self._rect.bottom and rect_bottom >= self._rect.top):
+                if (rect_left <= self._hurtbox.right and rect_right >= self._hurtbox.left
+                    and rect_top <= self._hurtbox.bottom and rect_bottom >= self._hurtbox.top):
                     #hit detected, gotta mark this batch of knives as ded
                     for x in group:
                         x.alive = False
@@ -522,6 +552,7 @@ class Crystal:
         self._pos = pygame.Vector2(data[0], data[1])
         self._rect = self._image.get_rect(midbottom=self._pos)
         self._died = False
+        self._hurtbox = self._rect.copy()
 
         match index:
             case 0:
@@ -533,6 +564,7 @@ class Crystal:
                 self._item = Item(loader, item_type, self._pos)
 
     def update(self, dt, player, knives):
+        self.update_hurtbox()
         if not self._died:
             if self._alive and self.is_hit(knives):
                 self._hit = True
@@ -565,6 +597,35 @@ class Crystal:
                     self._shake_timer = 0
                     self._hit = False
         self._item.update(dt, player)
+
+    def update_hurtbox(self):
+        mask = pygame.mask.from_surface(self._image)
+        rects = mask.get_bounding_rects()
+
+        if rects:
+            largest = max(rects, key=lambda r: r.width * r.height)
+
+            if not hasattr(self, "_hurtbox"):
+                # initialize once
+                self._hurtbox = pygame.Rect(
+                    self._rect.left + largest.left,
+                    self._rect.top + largest.top,
+                    largest.width,
+                    largest.height
+                )
+            else:
+                # update existing rect in place
+                self._hurtbox.update(
+                    self._rect.left + largest.left,
+                    self._rect.top + largest.top,
+                    largest.width,
+                    largest.height
+                )
+        else:
+            if not hasattr(self, "_hurtbox"):
+                self._hurtbox = self._rect.copy()
+            else:
+                self._hurtbox.update(self._rect)
 
     # helper function to apply flash effect when hit
     def apply_flash(self, color=(255, 0, 0), alpha=120):
@@ -613,8 +674,8 @@ class Crystal:
                 rect_right = max(x.rect.right for x in group)
                 rect_bottom = max(x.rect.bottom for x in group)
 
-                if (rect_left <= self._rect.right and rect_right >= self._rect.left
-                    and rect_top <= self._rect.bottom and rect_bottom >= self._rect.top):
+                if (rect_left <= self._hurtbox.right and rect_right >= self._hurtbox.left
+                    and rect_top <= self._hurtbox.bottom and rect_bottom >= self._hurtbox.top):
                     #hit detected, gotta mark this batch of knives as ded
                     for x in group:
                         x.alive = False

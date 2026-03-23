@@ -252,7 +252,7 @@ class Menu:
         else:
             #edit game volume
             if up:
-                self.setting_options["GAME VOLUME"] = (self.setting_options["GAME VOLUME"] + 1) % 100
+                self.setting_options["VOLUME"] = (self.setting_options["VOLUME"] + 1) % 100
             else:
-                self.setting_options["GAME VOLUME"] = (self.setting_options["GAME VOLUME"] - 1) % 100
+                self.setting_options["VOLUME"] = (self.setting_options["VOLUME"] - 1) % 100
             
