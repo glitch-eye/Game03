@@ -111,12 +111,14 @@ class SmokeColumn:
 
         if self.hitbox and self.hitbox.colliderect(player.get_hurtbox_rect()):
             player.time_energy -= 8 * dt
+            player._inSmoke = True
 
     def timestop_update(self, dt, player):
         self.hitbox = self.rect.copy()
 
         if self.hitbox and self.hitbox.colliderect(player.get_hurtbox_rect()):
             player.time_energy -= 8 * dt
+            player._inSmoke = True
     
     def draw(self, screen, camera_x, camera_y):
         frame = self.frames[self.frame_index]

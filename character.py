@@ -237,6 +237,8 @@ class Character:
         self._takingDamage = False
         self._damageDuration = 0.5
         self._maxDamageDuration = 0.5
+        self._tinted_lastframe = False
+        self._inSmoke = False
         self._damageLock = False  
         self._knockbackVel = pygame.Vector2(0, 0)
 
@@ -362,6 +364,7 @@ class Character:
     # -----------------------
 
     def update(self, dt):
+        self._inSmoke = False
         # hitbox update
         if self.player_sliding or self._crouching:
             self._hurtbox.x = PLAYER_CROUCH_HURTBOX_WIDTH
@@ -1027,7 +1030,8 @@ class Character:
         )
 
         # draw sprite
-        if self._takingDamage or self._dead:
+        if self._dead or self._inSmoke or self._takingDamage and not self._tinted_lastframe:
+            self._tinted_lastframe = True
             tinted = image.copy()
 
             overlay = pygame.Surface(image.get_size(), pygame.SRCALPHA)
@@ -1037,6 +1041,7 @@ class Character:
 
             screen.blit(tinted, screen_rect)
         else:
+            self._tinted_lastframe = False
             # Draw normal sprite
             screen.blit(image, screen_rect)
 
