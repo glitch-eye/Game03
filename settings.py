@@ -94,4 +94,5 @@ BOSS_ARENA = pygame.Rect(3436, 324, 1516, 692)
 #Items
 ITEM_COLLECT_RANGE = 50
 
+PLAYER_INIT_POS_TEST = pygame.Vector2(2850, 680)
 
