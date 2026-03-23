@@ -141,8 +141,8 @@ class Boss:
         self.speed = 0
 
         # HP
-        self.hp = 750
-        self.max_hp = 1500
+        self.hp = 1000
+        self.max_hp = 1000
         self._dead = False
         # hurt flash system
         self._hit = False
@@ -152,6 +152,7 @@ class Boss:
         self._dying = False 
         self._dead_anim_done = False
         # MASTER SPARKSSSSSSSSSSSSS
+        self.master_spark_proj = None
 
     def arena_left(self):  return self.arena.left
     def arena_right(self): return self.arena.right
@@ -366,7 +367,7 @@ class Boss:
         
         # apply red flash if hit
         if self._hit:
-            image = self.apply_flash()
+            image = self.apply_flash_to(image)
 
         # -----------------------
         # DRAW AFTERIMAGES
@@ -1072,13 +1073,21 @@ class Boss:
         # PHASE 4 — FIRE AND MOVE ACROSS UNTIL COVER 500 PIXELS
         # -----------------------
         elif self.attack_state == "master_spark":
+
+            if self.master_spark_proj is None:
+                self.master_spark_proj = MasterSparkProjectile(
+                    self,
+                    self.supershot,
+                    1080
+                )
+                self.game.enemy_projectiles.append(self.master_spark_proj)
             
             if not hasattr(self, "spark_start_x"):
                 self.spark_start_x = self.pos.x
                 self.spark_dir = 1 if self.facing_right else -1
 
             # Move in locked direction
-            speed = 600  # pixels per second
+            speed = 225  # pixels per second
             self.pos.x += self.spark_dir * speed * dt
 
             # Check distance traveled
@@ -1093,6 +1102,7 @@ class Boss:
         # PHASE 5 — RECOVERY
         # -----------------------
         elif self.attack_state == "recovery":
+            self.master_spark_proj = None
             if self.frame_index >= len(self.frames) - 1:
                 self.set_animation("stand")
                 self.attack_state = "stand_up"
@@ -1213,9 +1223,9 @@ class Boss:
             self.afterimages.clear()
             self.dash_particles.clear()
         
-    def apply_flash(self, color=(255, 0, 0), alpha=120):
-        flash_img = self.image.copy()
-        tint = pygame.Surface(self.image.get_size(), pygame.SRCALPHA)
+    def apply_flash_to(self, surface, color=(255, 0, 0), alpha=120):
+        flash_img = surface.copy()
+        tint = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         tint.fill((*color, alpha))
         flash_img.blit(tint, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
         return flash_img

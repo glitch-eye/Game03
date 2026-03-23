@@ -110,14 +110,14 @@ class SmokeColumn:
         self.hitbox = self.rect.copy()
 
         if self.hitbox and self.hitbox.colliderect(player.get_hurtbox_rect()):
-            player.time_energy -= 30 * dt
+            player.time_energy -= 50 * dt
             player._inSmoke = True
 
     def timestop_update(self, dt, player):
         self.hitbox = self.rect.copy()
 
         if self.hitbox and self.hitbox.colliderect(player.get_hurtbox_rect()):
-            player.time_energy -= 30 * dt
+            player.time_energy -= 50 * dt
             player._inSmoke = True
     
     def draw(self, screen, camera_x, camera_y):
@@ -498,3 +498,141 @@ class ShotProjectile:
         screen.blit(self.image, self.rect.move(int(-camera_x), int(-camera_y)))
         pygame.draw.rect(screen, (0,0,255),
                  self.hitbox.move(int(-camera_x), int(-camera_y)), 2)
+        
+class MasterSparkProjectile:
+    def __init__(self, boss, anims, ground_y):
+        self.boss = boss
+        self.anims = anims
+        self.ground_y = ground_y
+        self.alive = True
+
+        self.frame = 0
+        self.timer = 0
+        self.frame_speed = 0.05
+
+        # convenience
+        self.anim_a = anims["a"]
+        self.anim_b = anims["b"]
+        self.anim_c = anims["c"]
+        self.anim_d = anims["d"]
+
+        self.hitboxes = []
+        self.segment_size = 102
+
+    def update(self, dt, player, particle_list):
+        # Die when boss stops firing
+        if self.boss.attack_state != "master_spark":
+            self.alive = False
+            return
+        
+        for hb in self.hitboxes:
+            if hb.colliderect(player.get_hurtbox_rect()):
+                player.apply_damage(40, self.boss.rect.centerx)
+                break
+        
+        self.timer += dt
+        if self.timer >= self.frame_speed:
+            self.timer = 0
+            self.frame += 1
+
+        # loop animation
+        self.frame %= len(self.anim_a)
+
+    def draw(self, screen, camera_x, camera_y):
+        boss = self.boss
+
+        # --- ORIGIN POSITION ---
+        boss_mid_x = boss.rect.centerx
+        start_y = boss.rect.centery + 20  # slightly below center
+
+        # total beam height
+        total_height = self.ground_y - start_y
+        segment_count = max(1, total_height // self.segment_size)
+
+        # ======================
+        # A — ORIGIN
+        # ======================
+        frame_a = self.anim_a[self.frame % len(self.anim_a)]
+        rect_a = frame_a.get_rect(midtop=(boss_mid_x, start_y))
+        screen.blit(frame_a, rect_a.move(-camera_x, -camera_y))
+
+        # --- MUZZLE HITBOX ---
+        bbox = frame_a.get_bounding_rect()
+        hitbox = pygame.Rect(
+            rect_a.left + bbox.left,
+            rect_a.top  + bbox.top,
+            bbox.width,
+            bbox.height
+        )
+        self.hitboxes.append(hitbox)
+
+        # ======================
+        # B + C — BODY (CROP ONLY OVERFLOW)
+        # ======================
+        current_y = start_y + frame_a.get_height() - 24 
+        max_bottom = self.ground_y
+
+        i = 0
+        while True:
+            # choose alternating segment
+            if i % 2 == 0:
+                frame = self.anim_b[self.frame % len(self.anim_b)]
+            else:
+                frame = self.anim_c[self.frame % len(self.anim_c)]
+
+            seg_top = current_y
+            seg_bottom = current_y + frame.get_height()
+
+            # If fully visible → draw normally
+            if seg_bottom <= max_bottom:
+                rect = frame.get_rect(midtop=(boss_mid_x, seg_top))
+                screen.blit(frame, rect.move(-camera_x, -camera_y))
+
+                bbox = frame.get_bounding_rect()
+                hitbox = pygame.Rect(
+                    rect.left + bbox.left,
+                    rect.top  + bbox.top,
+                    bbox.width,
+                    bbox.height
+                )
+                self.hitboxes.append(hitbox)
+
+            else:
+                # Partially visible → crop only overflow
+                visible_height = max_bottom - seg_top
+                if visible_height > 0:
+                    cropped = frame.subsurface((0, 0, frame.get_width(), visible_height))
+                    rect = cropped.get_rect(midtop=(boss_mid_x, seg_top))
+                    screen.blit(cropped, rect.move(-camera_x, -camera_y))
+
+                    bbox = cropped.get_bounding_rect()
+                    hitbox = pygame.Rect(
+                        rect.left + bbox.left,
+                        rect.top  + bbox.top,
+                        bbox.width,
+                        bbox.height
+                    )
+                    self.hitboxes.append(hitbox)
+                break
+
+            current_y += frame.get_height()
+            i += 1
+
+        # ======================
+        # D — IMPACT
+        # ======================
+        ground_y = self.ground_y
+
+        frame_d = self.anim_d[self.frame % len(self.anim_d)]
+        rect_d = frame_d.get_rect(midbottom=(boss_mid_x, ground_y))
+        screen.blit(frame_d, rect_d.move(-camera_x, -camera_y))
+
+        for hb in self.hitboxes:
+            pygame.draw.rect(screen, (0,0,255), hb.move(-camera_x,-camera_y), 2)
+
+    def timestop_update(self, dt, player):
+                
+        for hb in self.hitboxes:
+            if hb.colliderect(player.get_hurtbox_rect()):
+                player.apply_damage(40, self.boss.rect.centerx)
+                break

@@ -28,7 +28,7 @@ class Character:
         self.map = None
 
         #stats
-        self._pos = PLAYER_INIT_POS_TEST
+        self._pos = PLAYER_INIT_POS
         self._hurtbox = pygame.Vector2(PLAYER_HURTBOX_WIDTH, PLAYER_HURTBOX_HEIGHT)
         self._vel = pygame.Vector2(0, 0)
         self._moveSpeed = PLAYER_SPEED
